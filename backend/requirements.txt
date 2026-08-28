@@ -1,0 +1,25 @@
+# Núcleo
+Django==5.0.2
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-filter==23.5
+python-dotenv==1.0.1
+
+# Leitura da NFC-e no portal da SEFAZ
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# Importação da planilha de entrada e saída
+openpyxl==3.1.2
+
+# Testes
+pytest==8.3.4
+
+# --- Só necessárias em produção -------------------------------------------
+# Sem estas o projeto roda em SQLite com autenticação de desenvolvimento.
+# Descomente ao configurar Supabase / Redis / Firebase.
+# psycopg2-binary==2.9.9
+# django-redis==5.4.0
+# firebase-admin==6.4.0
+# gunicorn==21.2.0

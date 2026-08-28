@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+db.sqlite3
+.env
+staticfiles/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.env.local
+
+# Credenciais — nunca versione
+serviceAccountKey.json
+*firebase-adminsdk*.json

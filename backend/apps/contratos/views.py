@@ -2,14 +2,17 @@ from datetime import date
 
 from django.db.models import Count, Sum
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, status
+from rest_framework import filters, mixins, status, viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.common.api import WorkspaceViewSet
+from apps.common.api import WorkspaceViewSet, workspace_do_request
 from apps.contratos.models import Contrato
+from apps.contratos.models import ParcelaPrevista
 from apps.contratos.serializers import (
-    ContratoSerializer, ParcelaPrevistaSerializer, SimulacaoSerializer,
+    ContratoSerializer, ParcelaComContratoSerializer, ParcelaPrevistaSerializer,
+    SimulacaoSerializer,
 )
 
 
@@ -69,3 +72,53 @@ class ContratoViewSet(WorkspaceViewSet):
         serializer = SimulacaoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.projetar())
+
+
+class ParcelaViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    Parcelas previstas de todos os contratos, para a linha do tempo de projeção.
+
+    Somente leitura: parcela nasce da projeção do contrato e nunca é editada à
+    mão. Alterar uma parcela isolada faria a projeção discordar do contrato que
+    a originou.
+
+    GET /api/parcelas/?inicio=2026-01-01&fim=2026-06-01
+    """
+
+    serializer_class = ParcelaComContratoSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["contrato", "competencia"]
+    ordering_fields = ["data_planejada", "valor_previsto"]
+    ordering = ["data_planejada", "id"]
+
+    def get_queryset(self):
+        # ParcelaPrevista não tem workspace próprio: o isolamento vem pelo
+        # contrato. Por isso o filtro não pode herdar de WorkspaceViewSet.
+        workspace = workspace_do_request(self.request)
+        if workspace is None:
+            return ParcelaPrevista.objects.none()
+
+        consulta = (
+            ParcelaPrevista.objects.filter(contrato__workspace=workspace)
+            .exclude(contrato__status="ENCERRADO")
+            .select_related(
+                "contrato",
+                "contrato__estabelecimento",
+                "contrato__categoria",
+                "contrato__classificacao",
+                "realizado",
+            )
+        )
+
+        inicio = self.request.query_params.get("inicio")
+        fim = self.request.query_params.get("fim")
+        if inicio:
+            consulta = consulta.filter(competencia__gte=inicio)
+        if fim:
+            consulta = consulta.filter(competencia__lte=fim)
+        if self.request.query_params.get("tipo"):
+            consulta = consulta.filter(
+                contrato__tipo=self.request.query_params["tipo"].upper()
+            )
+        return consulta

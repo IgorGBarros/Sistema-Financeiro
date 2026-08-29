@@ -1,59 +1,161 @@
+/* Fontes auto-hospedadas. Não usamos o Google Fonts por CDN de propósito:
+   o app é um PWA que precisa abrir offline, e uma requisição externa de fonte
+   falharia justamente no corredor do supermercado. Assim elas entram no
+   precache do service worker. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource-variable/jetbrains-mono";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 11%;
-    --radius: 0.6rem;
+    /* Superfícies, do mais recuado ao mais elevado */
+    --surface: #f8f9ff;
+    --surface-bright: #f8f9ff;
+    --surface-dim: #cbdbf5;
+    --surface-variant: #d3e4fe;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #eff4ff;
+    --surface-container: #e5eeff;
+    --surface-container-high: #dce9ff;
+    --surface-container-highest: #d3e4fe;
 
-    /* Receita e despesa são conceito de domínio, não decoração: ficam como
-       variável para que gráfico, badge e tabela nunca discordem. */
-    --receita: 142 71% 36%;
-    --despesa: 0 72% 51%;
+    --on-surface: #0b1c30;
+    --on-surface-variant: #45464d;
+
+    --outline: #76777d;
+    --outline-variant: #c6c6cd;
+
+    --primary: #131b2e;
+    --primary-container: #131b2e;
+    --on-primary: #ffffff;
+    --on-primary-container: #dae2fd;
+
+    --secondary: #0058be;
+    --secondary-container: #2170e4;
+    --on-secondary: #ffffff;
+    --on-secondary-container: #fefcff;
+
+    --error: #ba1a1a;
+    --error-container: #ffdad6;
+    --on-error: #ffffff;
+    --on-error-container: #93000a;
+
+    /* Entrada e saída. O verde do mockup (#4edea3) dá contraste de ~1.9:1
+       sobre fundo claro, bem abaixo do mínimo de 4.5:1 para texto. Aqui ele
+       fica só como cor de marcador; o texto usa o tom escuro. */
+    --receita: #137333;
+    --receita-surface: #e6f4ea;
+    --receita-on: #0b5222;
+    --despesa: #ba1a1a;
+    --despesa-surface: #ffdad6;
+    --despesa-on: #93000a;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 13%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 213 27% 84%;
-    --receita: 142 69% 45%;
-    --despesa: 0 72% 60%;
+    --surface: #0b111f;
+    --surface-bright: #16203a;
+    --surface-dim: #070b14;
+    --surface-variant: #2a3550;
+    --surface-container-lowest: #0d1424;
+    --surface-container-low: #131b2e;
+    --surface-container: #182136;
+    --surface-container-high: #1f2b45;
+    --surface-container-highest: #263454;
+
+    --on-surface: #e6ecf8;
+    --on-surface-variant: #a9b3c9;
+
+    --outline: #6b748c;
+    --outline-variant: #333e58;
+
+    --primary: #dae2fd;
+    --primary-container: #131b2e;
+    --on-primary: #131b2e;
+    --on-primary-container: #dae2fd;
+
+    --secondary: #adc6ff;
+    --secondary-container: #24457f;
+    --on-secondary: #002f66;
+    --on-secondary-container: #dae2fd;
+
+    --error: #ffb4ab;
+    --error-container: #93000a;
+    --on-error: #690005;
+    --on-error-container: #ffdad6;
+
+    --receita: #4edea3;
+    --receita-surface: #0d3a25;
+    --receita-on: #6ffbbe;
+    --despesa: #ff8f86;
+    --despesa-surface: #4a0f0c;
+    --despesa-on: #ffdad6;
   }
 
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  * {
+    @apply border-outline-variant;
+  }
 
-  /* Valores em coluna precisam alinhar. Sempre. */
-  .tabular-nums { font-variant-numeric: tabular-nums; }
+  body {
+    @apply bg-surface text-on-surface antialiased;
+  }
+
+  /* Toda coluna de valor usa isto. Sem alinhamento tabular os centavos
+     dançam, e ler uma coluna de números fica pior que ler uma lista. */
+  .tabular {
+    font-family: theme("fontFamily.mono");
+    font-variant-numeric: tabular-nums;
+    @apply text-data-tabular;
+  }
+}
+
+@layer components {
+  /* Cartão base do layout bento */
+  .cartao {
+    @apply rounded-xl border border-outline-variant bg-surface-container-lowest shadow-card;
+  }
+
+  .rotulo {
+    @apply text-label-caps uppercase text-on-surface-variant;
+  }
+}
+
+@layer utilities {
+  /* Cantos da mira do scanner */
+  .mira {
+    @apply absolute h-8 w-8 border-2 border-receita;
+  }
+  .mira-se {
+    @apply left-4 top-4 border-b-0 border-r-0;
+  }
+  .mira-sd {
+    @apply right-4 top-4 border-b-0 border-l-0;
+  }
+  .mira-ie {
+    @apply bottom-4 left-4 border-r-0 border-t-0;
+  }
+  .mira-id {
+    @apply bottom-4 right-4 border-l-0 border-t-0;
+  }
+}
+
+/* Barra de rolagem discreta, para não competir com as tabelas densas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--outline-variant);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--outline);
 }

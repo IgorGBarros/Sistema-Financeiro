@@ -245,3 +245,38 @@ O atalho longo no ícone abre direto o scanner (`/notas?scan=1`).
 `registerType: "prompt"`: uma versão nova não recarrega a página sozinha. A
 barra de status avisa e a pessoa decide quando atualizar — recarregar no meio
 de um cadastro perderia o que ela estava digitando.
+
+
+## Sistema visual
+
+Os tokens vivem em `frontend/src/index.css` como variáveis CSS e são expostos
+ao Tailwind em `tailwind.config.js`. Tema escuro é troca de valores das
+variáveis, não uma segunda tabela de classes.
+
+A escala segue Material 3: superfícies do mais recuado (`surface-dim`) ao mais
+elevado (`surface-container-highest`), com `on-surface` e `on-surface-variant`
+para texto. Além disso há dois tokens de domínio, `receita` e `despesa`, porque
+entrada e saída são conceito de negócio e não decoração — gráfico, tabela e
+selo precisam concordar sempre.
+
+Três desvios conscientes em relação ao mockup:
+
+**Ícones em Lucide, não Material Symbols.** O Material Symbols só existe como
+webfont do Google Fonts, e uma requisição externa quebraria offline. O Lucide
+já era dependência, vem como SVG e some do bundle o que não é usado.
+
+**Fontes auto-hospedadas** via `@fontsource`, pelo mesmo motivo: entram no
+precache do service worker em vez de depender do CDN.
+
+**Verde de receita mais escuro.** O `#4edea3` do mockup dá contraste de ~1.9:1
+sobre fundo claro, bem abaixo do mínimo de 4.5:1 para texto. Ele continua como
+cor de marcador e borda; o texto usa `#137333`.
+
+### Classes utilitárias
+
+| Classe | Uso |
+|---|---|
+| `.cartao` | Cartão do layout bento: borda, raio, sombra |
+| `.rotulo` | Rótulo em caixa alta das tabelas e KPIs |
+| `.tabular` | Números em fonte monoespaçada, para colunas alinharem |
+| `.mira-*` | Cantos da mira do scanner |

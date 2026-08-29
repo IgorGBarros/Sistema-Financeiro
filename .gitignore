@@ -19,4 +19,3 @@ frontend/dev-dist/
 node_modules/
 serviceAccountKey.json
 staticfiles/
-backend/.venv

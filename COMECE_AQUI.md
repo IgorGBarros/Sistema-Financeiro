@@ -147,33 +147,6 @@ Com `DEBUG=0`, defina `SECRET_KEY`, `ALLOWED_HOSTS` e `CORS_ORIGINS`.
 
 ## Problemas comuns
 
-**A detecção do Python falhou** — o script lista o que tentou e o que cada
-tentativa respondeu. Se você sabe onde o Python está, aponte direto:
-
-```powershell
-.\setup.ps1 -Python "C:\Python312\python.exe"
-```
-
-Para preparar só o backend, sem Node instalado ainda: `.\setup.ps1 -PularFrontend`
-
-**`.venv\Scripts\Activate.ps1` não é reconhecido** — o virtualenv não chegou
-a ser criado. Quase sempre é o atalho do Python da Microsoft Store: ele existe
-no PATH mas não é um Python de verdade. Confira com:
-
-```powershell
-python -c "import sys; print(sys.executable)"
-```
-
-Se o caminho contiver `WindowsApps`, desligue os atalhos em Configurações →
-Aplicativos → Configurações avançadas de aplicativo → Aliases de execução de
-aplicativo (desligue `python.exe` e `python3.exe`), ou instale o Python de
-python.org marcando "Add python.exe to PATH".
-
-**Arquivos soltos na raiz do projeto** — se `vite.config.ts`, `ARQUITETURA.md`
-ou `fila.ts` aparecem na raiz, você baixou arquivos avulsos em vez do zip. Eles
-são duplicatas do que já está nas subpastas; pode apagar. Os scripts de setup
-avisam quando detectam isso.
-
 **`ModuleNotFoundError: firebase_admin`** — normal em desenvolvimento. O import
 é preguiçoso e só acontece quando o Firebase está configurado.
 

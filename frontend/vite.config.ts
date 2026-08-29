@@ -1,8 +1,8 @@
 import path from "node:path";
 
 import react from "@vitejs/plugin-react";
-/// <reference types="vitest" />
-import { defineConfig } from "vite";
+// defineConfig do vitest, não do vite: só ele conhece a chave `test`.
+import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({

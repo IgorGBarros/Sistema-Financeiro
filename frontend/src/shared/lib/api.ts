@@ -76,8 +76,15 @@ export interface NotaFiscal {
   data_emissao: string | null;
   competencia: string | null;
   valor_total: string;
+  valor_desconto: string;
+  valor_tributos: string;
   quantidade_itens: number;
   forma_pagamento: string;
+  protocolo: string;
+  qr_url: string;
+  serie: string;
+  numero: string;
+  uf: string;
   status: "PENDENTE" | "IMPORTADA" | "ERRO" | "MANUAL";
   erro_consulta: string;
   itens?: ItemNota[];
@@ -100,6 +107,22 @@ export interface RespostaAssistente {
 export interface CapacidadesAssistente {
   ferramentas: { nome: string; descricao: string }[];
   exemplos: string[];
+}
+
+export interface Parcela {
+  id: string;
+  contrato: string;
+  contrato_descricao: string;
+  estabelecimento: string;
+  tipo: TipoLancamento;
+  categoria: string;
+  classificacao: string;
+  indice: number;
+  competencia: string;
+  data_planejada: string;
+  valor_previsto: string;
+  quantidade_planejada: number;
+  pago: boolean;
 }
 
 export interface LinhaFluxo {
@@ -221,6 +244,10 @@ export const api = {
     lista<Categoria>(`/categorias/?${qs({ tipo })}`),
 
   estabelecimentos: () => lista<Estabelecimento>("/estabelecimentos/"),
+
+  /** Parcelas de todos os contratos no período — alimenta a linha do tempo. */
+  parcelas: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Parcela>(`/parcelas/?${qs({ page_size: "200", ...filtros })}`),
 
   contratos: (filtros: Record<string, string | undefined> = {}) =>
     lista<Contrato>(`/contratos/?${qs(filtros)}`),

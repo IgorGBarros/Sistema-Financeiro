@@ -15,6 +15,41 @@ class ParcelaPrevistaSerializer(serializers.ModelSerializer):
         ]
 
 
+class ParcelaComContratoSerializer(serializers.ModelSerializer):
+    """
+    Parcela vista de fora do contrato, para a linha do tempo de projeção.
+
+    Traz o mínimo que a interface precisa para renderizar sem uma segunda
+    requisição por contrato — o painel mostra dezenas de parcelas de contratos
+    diferentes e uma consulta por linha seria N+1 na rede.
+    """
+
+    contrato_descricao = serializers.CharField(source="contrato.descricao", read_only=True)
+    estabelecimento = serializers.CharField(
+        source="contrato.estabelecimento.nome", read_only=True
+    )
+    tipo = serializers.CharField(source="contrato.tipo", read_only=True)
+    categoria = serializers.CharField(source="contrato.categoria.nome", read_only=True)
+    classificacao = serializers.CharField(
+        source="contrato.classificacao.nome", read_only=True
+    )
+    pago = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ParcelaPrevista
+        fields = [
+            "id", "contrato", "contrato_descricao", "estabelecimento", "tipo",
+            "categoria", "classificacao", "indice", "competencia",
+            "data_planejada", "valor_previsto", "quantidade_planejada", "pago",
+        ]
+        read_only_fields = fields
+
+    def get_pago(self, obj) -> bool:
+        # `realizado` vem do OneToOne reverso; o viewset faz select_related
+        # para não disparar uma consulta por parcela.
+        return getattr(obj, "realizado", None) is not None
+
+
 class ContratoSerializer(serializers.ModelSerializer):
     estabelecimento_nome = serializers.CharField(
         source="estabelecimento.nome", read_only=True

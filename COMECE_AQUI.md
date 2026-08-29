@@ -42,6 +42,37 @@ npm run dev
 Confira em <http://127.0.0.1:8000/api/saude/> — deve responder
 `{"status": "ok"}`.
 
+## O assistente de IA
+
+Opcional. Sem chave configurada os endpoints do assistente respondem 503 com
+instrução, e o resto do sistema funciona normalmente.
+
+Para ligar, adicione ao `backend/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+E reinicie a API. O assistente responde a partir dos seus próprios dados — ele
+consulta o banco por ferramentas de leitura, nunca escrevendo SQL. Veja
+`docs/ARQUITETURA.md` para o porquê.
+
+## Instalar no celular
+
+O frontend é um PWA. Com HTTPS, o navegador oferece "Adicionar à tela de
+início"; no iOS é manual (Compartilhar → Adicionar à Tela de Início).
+
+Instalado, ele **lê cupons sem conexão**: a leitura entra numa fila local e é
+enviada sozinha quando a internet voltar. É o cenário do corredor de
+supermercado com sinal fraco.
+
+Para testar no celular durante o desenvolvimento, a câmera exige HTTPS —
+`localhost` conta, o IP da rede local não:
+
+```bash
+npx localtunnel --port 5173
+```
+
 ## Pré-requisitos
 
 Python 3.10+ e Node 18+. Nada além disso: sem `DB_HOST` no ambiente, o projeto
@@ -106,13 +137,42 @@ Com `DEBUG=0`, defina `SECRET_KEY`, `ALLOWED_HOSTS` e `CORS_ORIGINS`.
 
 | Comando | Para quê |
 |---|---|
-| `pytest core/tests/` | 31 testes das regras de projeção e leitura de QR |
+| `make testes` | 57 testes (31 de regra + 14 com banco + 12 da fila offline) |
+| `make ajuda` | Lista todos os atalhos |
 | `python manage.py importar_planilha --arquivo x.xlsx --workspace <id> --dry-run` | Conferir a importação sem gravar |
+| `python manage.py check` | Checagem do Django |
 | `python manage.py refresh_consolidado` | Atualizar as views (só Postgres) |
 | `npm run lint` | Checagem de tipos do frontend |
 | `npm run build` | Build de produção |
 
 ## Problemas comuns
+
+**A detecção do Python falhou** — o script lista o que tentou e o que cada
+tentativa respondeu. Se você sabe onde o Python está, aponte direto:
+
+```powershell
+.\setup.ps1 -Python "C:\Python312\python.exe"
+```
+
+Para preparar só o backend, sem Node instalado ainda: `.\setup.ps1 -PularFrontend`
+
+**`.venv\Scripts\Activate.ps1` não é reconhecido** — o virtualenv não chegou
+a ser criado. Quase sempre é o atalho do Python da Microsoft Store: ele existe
+no PATH mas não é um Python de verdade. Confira com:
+
+```powershell
+python -c "import sys; print(sys.executable)"
+```
+
+Se o caminho contiver `WindowsApps`, desligue os atalhos em Configurações →
+Aplicativos → Configurações avançadas de aplicativo → Aliases de execução de
+aplicativo (desligue `python.exe` e `python3.exe`), ou instale o Python de
+python.org marcando "Add python.exe to PATH".
+
+**Arquivos soltos na raiz do projeto** — se `vite.config.ts`, `ARQUITETURA.md`
+ou `fila.ts` aparecem na raiz, você baixou arquivos avulsos em vez do zip. Eles
+são duplicatas do que já está nas subpastas; pode apagar. Os scripts de setup
+avisam quando detectam isso.
 
 **`ModuleNotFoundError: firebase_admin`** — normal em desenvolvimento. O import
 é preguiçoso e só acontece quando o Firebase está configurado.

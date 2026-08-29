@@ -1,60 +1,70 @@
-# Sistema financeiro — leitura de NFC-e, contratos previstos e realizados
+# Sistema Financeiro
 
-Implementação da regra de negócio descrita, com a lógica de projeção portada do
-DAX/TMDL do Power BI para Python.
+Controle de receitas e despesas com projeção de contratos, leitura de cupom
+fiscal por QR Code e assistente de IA sobre os próprios dados.
 
----
+- **Começar:** [COMECE_AQUI.md](COMECE_AQUI.md)
+- **Arquitetura:** [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
+- **Endpoints:** [docs/API.md](docs/API.md)
 
-## 1. Modelo de dados
-
-```
-Classificacao ──┐            (Essenciais / Bons / Ruins / Custos Operacionais,
-   (cadastrável) │             cadastrável pelo usuário)
-                 ▼
-             Categoria ──────────────┐
-                 │                   │
-                 ▼                   ▼
-   ┌──────── Contrato ────────┐   NotaFiscal ── ItemNotaFiscal
-   │   (Tabela Entrada e      │   (Tabela Mercado)
-   │    Saída = previstos)    │        │
-   │                          │        │ soma por mês
-   ▼                          │        ▼
-ParcelaPrevista ◄─────────────┘   vw_mercado_consolidado
-   (projeção mês a mês)                │  (materialized view)
-        │                              │
-        │  mesma competência           │ 1 linha por mês
-        └──────────► Realizado ◄───────┘
-                  (o que foi pago de fato)
+```bash
+make instalar && make migrar && make seed
+make api    # terminal 1
+make web    # terminal 2
 ```
 
-### Por que a Tabela Consolidado não virou tabela
+## O que o sistema faz
 
-Você suspeitou certo. O consolidado é 100% derivado das notas — se virasse
-tabela gravável, criaria uma segunda versão da verdade que pode divergir. Ele é
-uma **materialized view** (`vw_mercado_consolidado`), lida pelo ORM como model
-`managed = False`. Você consulta como tabela, mas não tem como ela sair do ar
-com o detalhe.
+**Projeção de contratos.** Cada entrada ou saída tem vigência própria, e o
+sistema gera a série de parcelas mês a mês a partir dela. A lógica é um porte
+fiel do DAX/TMDL do Power BI, incluindo as duas armadilhas do `DATEDIFF` que
+quebram reimplementações ingênuas — detalhes em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
-O que **precisa** existir como linha real é o `Realizado` de origem `MERCADO`:
-um lançamento por mês que representa o mercado dentro do fluxo de caixa. É
-assim que a Tabela Mercado entra na Tabela Entrada e Saída — 40 cupons viram um
-lançamento de "Alimentação" na competência, com o detalhe preservado nas notas.
+**Leitura de cupom fiscal.** O QR Code da NFC-e é lido pela câmera, validado
+(dígito verificador módulo 11) e consultado no portal da SEFAZ-BA. A chave de
+44 dígitos já entrega emitente, competência, série e número **sem chamada de
+rede**, então o cupom é cadastrável mesmo sem sinal no mercado.
 
-### Duas normalizações em relação à planilha
+**Previsto × realizado.** Meses passados mostram o que foi pago; meses futuros,
+a projeção. O saldo acumulado atravessa os dois e responde em que mês o
+dinheiro acaba.
 
-**Sinal.** Na planilha, receita é negativa (`-5543` de salário) e despesa é
-positiva. No banco o valor é sempre positivo e o sinal vem do campo `tipo`.
-Misturar sinal com natureza faz todo `SUM` precisar saber de qual conta está
-falando — e é como um `ABS()` esquecido vira erro de milhares de reais.
+**Funciona no mercado sem sinal.** O app é um PWA instalável. Cupom lido
+offline entra numa fila local e sobe sozinho quando a conexão volta — o
+endpoint é idempotente pela chave de acesso, então reenviar nunca duplica
+despesa.
 
-**A coluna "Tipo de Contrato" (M/A) é frequência, não tipo.** Virou
-`frequencia`, agora com M/B/T/S/A/U. O que a planilha chamava de "Categoria"
-(Receita/Despesa) virou `tipo`; "Classificação" virou `categoria`; e a
-classificação de verdade (Essencial/Bom/Ruim/Operacional) é uma tabela própria.
+**Assistente.** Pergunte em português sobre seus contratos e seus gastos. O
+modelo não escreve SQL: ele escolhe entre ferramentas de leitura, e o workspace
+é injetado pelo servidor. As ferramentas reusam os mesmos serviços que alimentam
+as telas, então o assistente e o gráfico nunca discordam.
 
----
+## Stack
 
-## 2. A projeção — porte do DAX
+| Camada | Tecnologia |
+|---|---|
+| Backend | Django 5.0 + DRF, apps por domínio |
+| Banco | PostgreSQL (Supabase) em produção, SQLite em desenvolvimento |
+| Autenticação | Firebase Admin + SimpleJWT |
+| IA | API da Anthropic, tool use |
+| Frontend | React 18 + Vite + TypeScript, Tailwind, shadcn/ui |
+| Dados | TanStack Query, React Hook Form + Zod, Recharts |
+| Scanner | html5-qrcode |
+
+## Testes
+
+```bash
+make testes
+```
+
+57 testes: 31 de regra pura (projeção e leitura de QR, sem banco, 0,07s), 14
+com banco — incluindo isolamento entre workspaces no assistente — e 12 da fila
+offline de cupons.
+
+## Apêndice: regras de negócio em detalhe
+
+### A projeção — porte do DAX
 
 `core/services/projecao.py` reproduz a tabela calculada
 `Contrato_Guarda-Chuva Futuros`. Duas armadilhas do DAX foram preservadas de
@@ -225,5 +235,3 @@ celular, não. Use um túnel (ngrok, Cloudflare Tunnel) para testar no aparelho.
   terreno: com o histórico, dá para sugerir categoria por produto recorrente.
 - **Telas de cadastro de contrato e de conciliação**: só o fluxo de caixa e o
   scanner foram escritos, por serem os que carregam regra de negócio.
-#   S i s t e m a - F i n a n c e i r o  
- 

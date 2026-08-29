@@ -1,15 +1,18 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { FileText, LayoutDashboard, Receipt } from "lucide-react";
+import { FileText, LayoutDashboard, Receipt, Sparkles } from "lucide-react";
 
-import Contratos from "./pages/Contratos";
-import FluxoCaixa from "./pages/FluxoCaixa";
-import Notas from "./pages/Notas";
-import { cn } from "./lib/utils";
+import Assistente from "@/features/assistente/Assistente";
+import Contratos from "@/features/contratos/Contratos";
+import FluxoCaixa from "@/features/fluxo/FluxoCaixa";
+import Notas from "@/features/fiscal/Notas";
+import { BarraStatus } from "@/shared/components/BarraStatus";
+import { cn } from "@/shared/lib/utils";
 
 const NAVEGACAO = [
   { para: "/fluxo", rotulo: "Fluxo de caixa", icone: LayoutDashboard },
   { para: "/contratos", rotulo: "Entradas e saídas", icone: FileText },
   { para: "/notas", rotulo: "Cupons fiscais", icone: Receipt },
+  { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
 ];
 
 export default function App() {
@@ -38,12 +41,15 @@ export default function App() {
         </div>
       </nav>
 
+      <BarraStatus />
+
       <main className="mx-auto max-w-6xl">
         <Routes>
           <Route path="/" element={<Navigate to="/fluxo" replace />} />
           <Route path="/fluxo" element={<FluxoCaixa />} />
           <Route path="/contratos" element={<Contratos />} />
           <Route path="/notas" element={<Notas />} />
+          <Route path="/assistente" element={<Assistente />} />
           <Route
             path="*"
             element={

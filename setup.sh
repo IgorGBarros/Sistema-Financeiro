@@ -34,6 +34,23 @@ FIM
   fi
 done
 
+# Arquivos que só fazem sentido dentro de subpastas. Soltos na raiz, são
+# duplicatas de quem baixou arquivos avulsos em vez do zip — confundem o
+# editor e a busca do projeto.
+SOLTOS=""
+for arquivo in vite.config.ts ARQUITETURA.md API.md BarraStatus.tsx fila.ts \
+               fila.test.ts useSincronizacao.ts api.ts ferramentas.py \
+               cliente.py models.py views.py; do
+  [ -f "$RAIZ/$arquivo" ] && SOLTOS="$SOLTOS  $arquivo\n"
+done
+if [ -n "$SOLTOS" ]; then
+  echo ""
+  echo "Aviso: estes arquivos estão soltos na raiz e não deveriam estar:"
+  printf "$SOLTOS"
+  echo "São duplicatas do que já existe nas subpastas. Pode apagar."
+  echo ""
+fi
+
 for cmd in python3 npm; do
   if ! command -v "$cmd" > /dev/null 2>&1; then
     echo "'$cmd' não está no PATH. Instale Python 3.10+ e Node 18+." >&2
@@ -46,8 +63,19 @@ PLANILHA="$RAIZ/dados/entrada_e_saida.xlsx"
 echo "==> Backend"
 cd "$RAIZ/backend"
 
-if [ ! -d .venv ]; then
-  python3 -m venv .venv
+if [ ! -f .venv/bin/activate ]; then
+  [ -d .venv ] && { echo "    virtualenv incompleto; recriando"; rm -rf .venv; }
+  if ! python3 -m venv .venv || [ ! -f .venv/bin/activate ]; then
+    cat >&2 <<FIM
+
+A criação do virtualenv falhou. Em Debian/Ubuntu, o módulo venv vem em
+pacote separado:
+
+    sudo apt install python3-venv
+
+FIM
+    exit 1
+  fi
   echo "    virtualenv criado em backend/.venv"
 fi
 # shellcheck disable=SC1091

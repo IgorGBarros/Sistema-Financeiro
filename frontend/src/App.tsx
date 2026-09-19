@@ -7,6 +7,7 @@ import Contas from "@/features/contas/Contas";
 import Contratos from "@/features/contratos/Contratos";
 import Documentos from "@/features/documentos/Documentos";
 import PlanoDeContas from "@/features/catalogo/PlanoDeContas";
+import Catalogo from "@/features/catalogo/Catalogo";
 import Realizados from "@/features/realizados/Realizados";
 import Financiamento from "@/features/financiamento/Financiamento";
 import Notas from "@/features/fiscal/Notas";
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/notas" element={<Notas />} />
         <Route path="/documentos" element={<Documentos />} />
         <Route path="/plano-de-contas" element={<PlanoDeContas />} />
+        <Route path="/catalogo" element={<Catalogo />} />
         <Route path="/financiamento" element={<Financiamento />} />
         <Route path="/folha" element={<Folha />} />
         <Route path="/contas" element={<Contas />} />

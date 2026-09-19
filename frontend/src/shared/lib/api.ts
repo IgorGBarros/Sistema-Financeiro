@@ -684,23 +684,6 @@ export const api = {
     request<MatrizContratos>(
       `/matriz-contratos/?${qs({ inicio, fim, agrupar_por })}`,
     ),
-  // --- plano de contas -----------------------------------------------------
-  salvarClassificacao: (dados: Partial<Classificacao>, id?: string) =>
-    request<Classificacao>(id ? `/classificacoes/${id}/` : "/classificacoes/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  salvarCategoria: (dados: Partial<Categoria>, id?: string) =>
-    request<Categoria>(id ? `/categorias/${id}/` : "/categorias/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  salvarEstabelecimento: (dados: Partial<Estabelecimento>, id?: string) =>
-    request<Estabelecimento>(id ? `/estabelecimentos/${id}/` : "/estabelecimentos/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-
   // --- realizados ----------------------------------------------------------
   realizados: (filtros: Record<string, string | undefined> = {}) =>
     lista<Realizado>(`/realizados/?${qs(filtros)}`),
@@ -709,6 +692,8 @@ export const api = {
       method: id ? "PATCH" : "POST",
       body: JSON.stringify(dados),
     }),
+  deletarRealizado: (id: string) =>
+    request<void>(`/realizados/${id}/`, { method: "DELETE" }),
 
   // --- pagamento da nota ---------------------------------------------------
   sugestaoPagamento: (notaId: string) =>
@@ -840,16 +825,6 @@ export const api = {
     request<CapacidadesAssistente>("/assistente/capacidades/"),
   conversas: () =>
     lista<{ id: string; titulo: string; atualizado_em: string }>("/assistente/"),
-
-  realizados: (filtros: Record<string, string | undefined> = {}) =>
-    lista<Realizado>(`/realizados/?${qs(filtros)}`),
-  salvarRealizado: (dados: Partial<Realizado>, id?: string) =>
-    request<Realizado>(id ? `/realizados/${id}/` : "/realizados/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  deletarRealizado: (id: string) =>
-    request<void>(`/realizados/${id}/`, { method: "DELETE" }),
 
   baixarParcela: (parcela: string, valor: string, data_pagamento: string) =>
     request(`/realizados/baixar-parcela/`, {

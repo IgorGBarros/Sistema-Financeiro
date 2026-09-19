@@ -8,12 +8,14 @@ uma query por série, não uma varredura em Python.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import DecimalField, F, Q, Sum, Value
+from django.db.models import DecimalField, F, Sum, Value
 from django.db.models.functions import Coalesce
+
+from apps.common.datas import hoje_local
+
 
 ZERO = Decimal("0")
 
@@ -25,6 +27,60 @@ def _somatorio_por_competencia(queryset, campo_valor: str) -> dict:
         .annotate(total=Coalesce(Sum(campo_valor), Value(ZERO), output_field=DecimalField()))
     )
     return {(l["competencia"], l["tipo"]): l["total"] for l in linhas}
+
+
+def _somar(destino: dict, origem: dict) -> None:
+    for chave, valor in origem.items():
+        destino[chave] = destino.get(chave, ZERO) + valor
+
+
+def _previsto_cartao(workspace, inicio: date, fim: date) -> dict:
+    """
+    Parcelas de compras no cartão, por competência da fatura.
+
+    A soma das parcelas de um mês é a fatura daquele mês — por isso a fatura
+    em si não vira lançamento. Contar as duas coisas seria contar o mesmo
+    dinheiro duas vezes.
+    """
+    from apps.cartoes.models import ParcelaCompra
+    from apps.common.models import TipoLancamento
+
+    linhas = (
+        ParcelaCompra.objects.filter(
+            compra__workspace=workspace,
+            competencia__gte=inicio,
+            competencia__lte=fim,
+        )
+        .values("competencia")
+        .annotate(total=Coalesce(Sum("valor"), Value(ZERO), output_field=DecimalField()))
+    )
+    return {(l["competencia"], TipoLancamento.DESPESA): l["total"] for l in linhas}
+
+
+def _previsto_financiamento(workspace, inicio: date, fim: date) -> dict:
+    """
+    Parcelas do financiamento ainda não pagas, com o valor real do banco.
+
+    Só as não pagas: uma parcela marcada como Paga no demonstrativo já é
+    realizado, e entraria em duplicidade se contasse como previsão.
+    """
+    from apps.common.models import TipoLancamento
+    from apps.financiamento.models import ParcelaFinanciamento
+
+    linhas = (
+        ParcelaFinanciamento.objects.filter(
+            financiamento__workspace=workspace,
+            financiamento__paga_do_proprio_bolso=True,
+            competencia__gte=inicio,
+            competencia__lte=fim,
+        )
+        .exclude(situacao="PAGA")
+        .values("competencia")
+        .annotate(
+            total=Coalesce(Sum("valor_total"), Value(ZERO), output_field=DecimalField())
+        )
+    )
+    return {(l["competencia"], TipoLancamento.DESPESA): l["total"] for l in linhas}
 
 
 def fluxo_mensal(
@@ -71,10 +127,18 @@ def fluxo_mensal(
     mapa_previsto = _somatorio_por_competencia(previstas, "valor_previsto")
     mapa_realizado = _somatorio_por_competencia(realizados, "valor")
 
+    # Cartão de crédito e financiamento têm projeção própria, e ela não passa
+    # por ParcelaPrevista: a do cartão vem das compras parceladas, a do
+    # financiamento vem do demonstrativo do banco. Somar aqui é o que faz o
+    # saldo do mês refletir o desembolso de verdade.
+    if not classificacoes and not categorias:
+        _somar(mapa_previsto, _previsto_cartao(workspace, inicio, fim))
+        _somar(mapa_previsto, _previsto_financiamento(workspace, inicio, fim))
+
     resultado: list[dict] = []
     saldo = Decimal(saldo_inicial)
     competencia = inicio
-    hoje = date.today().replace(day=1)
+    hoje = hoje_local().replace(day=1)
 
     while competencia <= fim:
         rec_prev = mapa_previsto.get((competencia, TipoLancamento.RECEITA), ZERO)

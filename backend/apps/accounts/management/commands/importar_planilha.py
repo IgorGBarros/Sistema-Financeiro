@@ -123,7 +123,12 @@ class Command(BaseCommand):
                     defaults={"codigo": celula(linha, "Cód. Estabelecimento")},
                 )
 
-                def data(nome):
+                # `linha` vem como argumento padrão de propósito: uma closure
+                # sobre variável de loop guarda a referência, não o valor. Hoje
+                # a função só é chamada dentro da mesma iteração, então
+                # funciona — mas basta alguém guardá-la numa lista para todas
+                # apontarem para a última linha da planilha.
+                def data(nome, linha=linha):
                     valor = celula(linha, nome)
                     if isinstance(valor, datetime):
                         return valor.date()

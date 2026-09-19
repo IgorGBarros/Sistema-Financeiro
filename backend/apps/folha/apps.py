@@ -1,0 +1,8 @@
+from django.apps import AppConfig
+
+
+class FolhaConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.folha"
+    label = "folha"
+    verbose_name = "Folha de pagamento"

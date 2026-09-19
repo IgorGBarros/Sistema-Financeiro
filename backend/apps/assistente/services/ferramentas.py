@@ -40,6 +40,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Callable
 
+from apps.common.datas import hoje_local
+
+
 MAX_LINHAS = 200  # teto de linhas devolvidas ao modelo, para não estourar contexto
 
 
@@ -75,7 +78,7 @@ class Ferramenta:
 
 def _competencia(valor: str | None, padrao: date | None = None) -> date:
     if not valor:
-        return padrao or date.today().replace(day=1)
+        return padrao or hoje_local().replace(day=1)
     try:
         partes = [int(p) for p in valor.split("-")[:2]]
         return date(partes[0], partes[1], 1)
@@ -101,7 +104,7 @@ def _dinheiro(valor) -> float:
 def consultar_fluxo_caixa(workspace, *, inicio: str = None, fim: str = None) -> dict:
     from apps.relatorios.services import fluxo_caixa
 
-    dt_inicio = _competencia(inicio, date.today().replace(day=1))
+    dt_inicio = _competencia(inicio, hoje_local().replace(day=1))
     dt_fim = _competencia(fim, dt_inicio.replace(year=dt_inicio.year + 1))
 
     linhas = fluxo_caixa.fluxo_mensal(workspace, inicio=dt_inicio, fim=dt_fim)[:MAX_LINHAS]
@@ -160,8 +163,8 @@ def listar_contratos(
 def resumo_por_classificacao(workspace, *, inicio: str = None, fim: str = None) -> dict:
     from apps.relatorios.services import fluxo_caixa
 
-    dt_inicio = _competencia(inicio, date.today().replace(month=1, day=1))
-    dt_fim = _competencia(fim, date.today().replace(month=12, day=1))
+    dt_inicio = _competencia(inicio, hoje_local().replace(month=1, day=1))
+    dt_fim = _competencia(fim, hoje_local().replace(month=12, day=1))
 
     linhas = fluxo_caixa.resumo_por_classificacao(workspace, inicio=dt_inicio, fim=dt_fim)
     return {
@@ -209,8 +212,8 @@ def comparar_previsto_realizado(workspace, *, competencia: str = None) -> dict:
 def consultar_gastos_mercado(workspace, *, inicio: str = None, fim: str = None) -> dict:
     from apps.fiscal.services.consolidacao import consolidado_via_orm
 
-    dt_inicio = _competencia(inicio, date.today().replace(day=1).replace(month=1))
-    dt_fim = _fim_do_mes(_competencia(fim, date.today()))
+    dt_inicio = _competencia(inicio, hoje_local().replace(day=1).replace(month=1))
+    dt_fim = _fim_do_mes(_competencia(fim, hoje_local()))
 
     linhas = consolidado_via_orm(workspace, inicio=dt_inicio, fim=dt_fim)
     return {
@@ -298,6 +301,148 @@ def simular_cancelamento(workspace, *, descricao: str, a_partir_de: str = None) 
     }
 
 
+
+
+def consultar_financiamento(workspace, *, incluir_parcelas: bool = False) -> dict:
+    """Situação dos financiamentos, com o total real que falta pagar."""
+    from apps.financiamento.models import Financiamento
+
+    resultado = []
+    for f in Financiamento.objects.filter(workspace=workspace).prefetch_related("parcelas"):
+        restantes = list(f.parcelas.exclude(situacao="PAGA").order_by("numero"))
+        paga = f.parcelas.filter(situacao="PAGA").order_by("-numero").first()
+        total = sum((p.valor_total for p in restantes), Decimal("0"))
+        juros = sum((p.juros for p in restantes), Decimal("0"))
+
+        item = {
+            "contrato": f.numero_contrato,
+            "instituicao": f.instituicao,
+            "sistema": f.sistema_amortizacao,
+            "parcelas_pagas": f.parcelas.filter(situacao="PAGA").count(),
+            "parcelas_restantes": len(restantes),
+            "saldo_devedor": _dinheiro(paga.saldo_devedor) if paga else None,
+            "total_a_pagar": _dinheiro(total),
+            "juros_a_pagar": _dinheiro(juros),
+            "proxima_parcela": _dinheiro(restantes[0].valor_total) if restantes else None,
+            "ultima_parcela": _dinheiro(restantes[-1].valor_total) if restantes else None,
+            "quitacao_prevista": restantes[-1].vencimento.isoformat() if restantes else None,
+        }
+        if incluir_parcelas:
+            item["proximas"] = [
+                {"vencimento": p.vencimento.isoformat(), "valor": _dinheiro(p.valor_total),
+                 "amortizacao": _dinheiro(p.amortizacao), "juros": _dinheiro(p.juros)}
+                for p in restantes[:MAX_LINHAS]
+            ]
+        resultado.append(item)
+
+    return {
+        "financiamentos": resultado,
+        "observacao": (
+            "No sistema SAC a parcela decresce ao longo do contrato. "
+            "'total_a_pagar' é a soma real das parcelas, não a parcela atual "
+            "multiplicada pelo número de meses."
+        ),
+    }
+
+
+def consultar_cartao(workspace, *, competencia: str = None) -> dict:
+    """Compras e parcelas do cartão numa competência."""
+    from apps.cartoes.models import Fatura, ParcelaCompra
+
+    mes = _competencia(competencia)
+    parcelas = ParcelaCompra.objects.filter(
+        compra__workspace=workspace, competencia=mes
+    ).select_related("compra", "compra__cartao", "compra__categoria")
+
+    total = sum((p.valor for p in parcelas), Decimal("0"))
+    faturas = Fatura.objects.filter(workspace=workspace, competencia=mes)
+
+    return {
+        "competencia": mes.strftime("%Y-%m"),
+        "total_das_parcelas": _dinheiro(total),
+        "quantidade": parcelas.count(),
+        "parcelas": [
+            {
+                "descricao": p.compra.descricao,
+                "cartao": p.compra.cartao.apelido,
+                "categoria": p.compra.categoria.nome,
+                "valor": _dinheiro(p.valor),
+                "parcela": f"{p.numero}/{p.compra.parcelas_total}",
+                "conciliada": p.conciliada_em is not None,
+            }
+            for p in parcelas[:MAX_LINHAS]
+        ],
+        "faturas_importadas": [
+            {"cartao": f.cartao.apelido, "total_informado": _dinheiro(f.valor_total_informado)}
+            for f in faturas
+        ],
+        "observacao": (
+            "A soma das parcelas do mês é a fatura do mês. A fatura não é "
+            "contada de novo como despesa — isso duplicaria o valor."
+        ),
+    }
+
+
+def consultar_conta_de_consumo(workspace, *, servico: str = "ENERGIA") -> dict:
+    """
+    Histórico de valor, consumo e tarifa.
+
+    Responde a pergunta que o valor sozinho não responde: a conta subiu porque
+    consumi mais, ou porque a tarifa aumentou?
+    """
+    from apps.contas.models import ContaConsumo
+
+    contas = ContaConsumo.objects.filter(
+        workspace=workspace, unidade__servico=servico.upper()
+    ).select_related("unidade").order_by("competencia")[:MAX_LINHAS]
+
+    return {
+        "servico": servico.upper(),
+        "meses": [
+            {
+                "competencia": c.competencia.strftime("%Y-%m"),
+                "valor": _dinheiro(c.valor_total),
+                "consumo": float(c.consumo) if c.consumo else None,
+                "tarifa_media": float(c.tarifa_media) if c.tarifa_media else None,
+            }
+            for c in contas
+        ],
+        "observacao": (
+            "Compare consumo e tarifa entre os meses: se o consumo subiu, é "
+            "hábito; se só a tarifa subiu, é reajuste da concessionária."
+        ),
+    }
+
+
+def consultar_holerite(workspace, *, ano: int = None) -> dict:
+    """Holerites importados. Ainda não entram no fluxo de caixa."""
+    from apps.folha.models import Holerite
+
+    consulta = Holerite.objects.filter(workspace=workspace).select_related("empregador")
+    if ano:
+        consulta = consulta.filter(competencia__year=ano)
+
+    return {
+        "holerites": [
+            {
+                "competencia": h.competencia.strftime("%Y-%m"),
+                "tipo": h.get_tipo_folha_display(),
+                "empregador": h.empregador.razao_social,
+                "vencimentos": _dinheiro(h.total_vencimentos),
+                "descontos": _dinheiro(h.total_descontos),
+                "liquido": _dinheiro(h.valor_liquido),
+                "conferencia_ok": h.conferencia_ok,
+            }
+            for h in consulta.order_by("-competencia")[:MAX_LINHAS]
+        ],
+        "aviso": (
+            "Os holerites estão isolados do fluxo de caixa por enquanto. O "
+            "fluxo usa o contrato de salário previsto, que pode divergir do "
+            "líquido real."
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Registro
 # ---------------------------------------------------------------------------
@@ -373,6 +518,46 @@ REGISTRO: dict[str, Ferramenta] = {
                 "fim": dict(_MES),
             },
             executar=buscar_produtos_comprados,
+        ),
+        Ferramenta(
+            nome="consultar_financiamento",
+            descricao=(
+                "Situação dos financiamentos: saldo devedor, parcelas pagas e "
+                "restantes, total real a pagar e data de quitação. Use para "
+                "perguntas sobre a casa, o imóvel ou quanto falta pagar."
+            ),
+            parametros={"incluir_parcelas": {"type": "boolean"}},
+            executar=consultar_financiamento,
+        ),
+        Ferramenta(
+            nome="consultar_cartao",
+            descricao=(
+                "Compras e parcelas do cartão de crédito numa competência, "
+                "com o total que compõe a fatura daquele mês."
+            ),
+            parametros={"competencia": dict(_MES)},
+            executar=consultar_cartao,
+        ),
+        Ferramenta(
+            nome="consultar_conta_de_consumo",
+            descricao=(
+                "Histórico da conta de luz, água ou gás com valor, consumo e "
+                "tarifa média. Use para 'por que a luz subiu' — separa aumento "
+                "de consumo de aumento de tarifa."
+            ),
+            parametros={
+                "servico": {"type": "string", "enum": ["ENERGIA", "AGUA", "GAS"]}
+            },
+            executar=consultar_conta_de_consumo,
+        ),
+        Ferramenta(
+            nome="consultar_holerite",
+            descricao=(
+                "Holerites importados, com vencimentos, descontos e líquido. "
+                "Use para perguntas sobre salário, INSS, imposto de renda ou 13º."
+            ),
+            parametros={"ano": {"type": "integer"}},
+            executar=consultar_holerite,
         ),
         Ferramenta(
             nome="simular_cancelamento",

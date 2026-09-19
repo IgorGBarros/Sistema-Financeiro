@@ -6,6 +6,10 @@ fiscal por QR Code e assistente de IA sobre os próprios dados.
 - **Começar:** [COMECE_AQUI.md](COMECE_AQUI.md)
 - **Arquitetura:** [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
 - **Endpoints:** [docs/API.md](docs/API.md)
+- **Previsão:** [docs/PREVISAO.md](docs/PREVISAO.md)
+- **Auditoria:** [docs/AUDITORIA.md](docs/AUDITORIA.md)
+- **Regra de negócio:** [docs/REGRA_DE_NEGOCIO.md](docs/REGRA_DE_NEGOCIO.md)
+- **Cartão de crédito:** [docs/CARTAO_DE_CREDITO.md](docs/CARTAO_DE_CREDITO.md)
 
 ```bash
 make instalar && make migrar && make seed
@@ -34,6 +38,17 @@ dinheiro acaba.
 offline entra numa fila local e sobe sozinho quando a conexão volta — o
 endpoint é idempotente pela chave de acesso, então reenviar nunca duplica
 despesa.
+
+**Importação de documentos.** Fatura de cartão, conta de luz, demonstrativo de
+financiamento e holerite viram dado estruturado a partir do PDF. O
+demonstrativo do banco entrega as 296 parcelas do financiamento com o valor
+exato de cada uma — o que corrigiu uma superestimativa de R$ 142 mil na
+projeção que usava valor fixo.
+
+**Previsão com cenários.** Backtesting escolhe, a cada consulta, o modelo que
+erra menos no seu próprio histórico. A saída não é um número, é uma faixa: o
+saldo provável, a amplitude em 80% dos cenários e a probabilidade de ficar
+negativo em cada mês.
 
 **Assistente.** Pergunte em português sobre seus contratos e seus gastos. O
 modelo não escreve SQL: ele escolhe entre ferramentas de leitura, e o workspace

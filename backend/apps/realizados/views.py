@@ -11,6 +11,9 @@ from apps.contratos.models import ParcelaPrevista
 from apps.realizados.models import Realizado
 from apps.realizados.serializers import RealizadoSerializer
 
+from apps.common.datas import hoje_local
+
+
 
 class RealizadoViewSet(WorkspaceViewSet):
     queryset = Realizado.objects.select_related("categoria", "contrato")
@@ -43,7 +46,7 @@ class RealizadoViewSet(WorkspaceViewSet):
             tipo=contrato.tipo,
             competencia=parcela.competencia,
             data_pagamento=date.fromisoformat(
-                request.data.get("data_pagamento", date.today().isoformat())
+                request.data.get("data_pagamento", hoje_local().isoformat())
             ),
             valor=Decimal(str(request.data.get("valor", parcela.valor_previsto))),
             forma_pagamento=request.data.get("forma_pagamento", ""),

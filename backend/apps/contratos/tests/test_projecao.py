@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from apps.contratos.services.projecao import (
-    edate, meses_calendario, numero_de_meses, projetar, quantidade_parcelas,
+    edate, meses_calendario, numero_de_meses, projetar,
 )
 
 # ---------------------------------------------------------------------------

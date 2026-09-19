@@ -19,3 +19,7 @@ frontend/dev-dist/
 node_modules/
 serviceAccountKey.json
 staticfiles/
+
+# Documentos de exemplo contêm dados pessoais reais (CPF, salário, saldo).
+# Descomente se o repositório virar público — os testes já usam skipif.
+# dados/exemplos/

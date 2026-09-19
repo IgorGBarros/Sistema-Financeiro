@@ -5,10 +5,11 @@ import {
   AlertTriangle, CheckCircle2, Clock, QrCode, RefreshCw, ScanLine, Upload,
 } from "lucide-react";
 
-import { api } from "@/shared/lib/api";
+import { api, type NotaFiscal } from "@/shared/lib/api";
 import { formatarCnpj, formatarMoeda } from "@/features/fiscal/nfce";
 import { listarPendentes } from "@/features/fiscal/fila";
 import { usePendentes, useSincronizacaoCupons } from "@/features/fiscal/hooks/useSincronizacao";
+import { ConfirmacaoPagamento } from "@/features/fiscal/components/ConfirmacaoPagamento";
 import { PainelCupom } from "@/features/fiscal/components/PainelCupom";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Selo } from "@/shared/components/Selo";
@@ -42,6 +43,7 @@ const dataCurta = (iso: string | null) => {
 export default function Notas() {
   const [scannerAberto, setScannerAberto] = useState(false);
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState<NotaFiscal | null>(null);
   const [parametros, setParametros] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -59,6 +61,12 @@ export default function Notas() {
   }, [parametros, setParametros]);
 
   const notas = useQuery({ queryKey: ["notas"], queryFn: () => api.notas() });
+  // `pendentes` já é o contador da fila offline; este é outro conceito:
+  // cupom lido cuja forma de pagamento ninguém informou.
+  const semPagamento = useQuery({
+    queryKey: ["notas", "sem-pagamento"],
+    queryFn: () => api.notasSemPagamento(),
+  });
 
   const reconsultar = useMutation({
     mutationFn: (id: string) => api.reconsultarNota(id),
@@ -129,6 +137,28 @@ export default function Notas() {
           </>
         }
       />
+
+      {(semPagamento.data?.total ?? 0) > 0 && (
+        <div className="cartao mb-container-padding border-amber-500/60 p-stack-md">
+          <div className="flex flex-wrap items-center justify-between gap-stack-sm">
+            <div>
+              <p className="font-medium text-on-surface">
+                {semPagamento.data!.total} cupom(ns) sem forma de pagamento
+              </p>
+              <p className="text-body-sm text-on-surface-variant">
+                Somam {formatarMoeda(semPagamento.data!.valor_total)} e ainda não
+                entraram no fluxo de caixa.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmando(semPagamento.data!.notas[0])}
+            >
+              Informar agora
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-container-padding lg:grid-cols-12">
         <div className="flex flex-col gap-container-padding lg:col-span-7">
@@ -277,9 +307,19 @@ export default function Notas() {
 
       <Suspense fallback={null}>
         {scannerAberto && (
-          <ScannerNota aberto onFechar={() => setScannerAberto(false)} />
+          <ScannerNota
+            aberto
+            onFechar={() => setScannerAberto(false)}
+            onNotaCadastrada={(nota) => {
+              // A nota já está salva. Perguntar a forma de pagamento agora,
+              // com o cupom em mãos, é quando a pessoa lembra.
+              if (nota.status === "IMPORTADA") setConfirmando(nota);
+            }}
+          />
         )}
       </Suspense>
+
+      <ConfirmacaoPagamento nota={confirmando} onFechar={() => setConfirmando(null)} />
     </div>
   );
 }

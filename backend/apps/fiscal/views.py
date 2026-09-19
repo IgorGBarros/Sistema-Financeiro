@@ -1,4 +1,3 @@
-from datetime import date
 
 from django.db import DatabaseError
 from django_filters.rest_framework import DjangoFilterBackend
@@ -10,10 +9,13 @@ from apps.common.api import WorkspaceViewSet, workspace_do_request
 from apps.fiscal.models import ConsolidadoMercado, NotaFiscal, StatusNota
 from apps.fiscal.serializers import (
     ConsolidadoMercadoSerializer, NotaFiscalResumoSerializer,
-    NotaFiscalSerializer, ScanNotaSerializer,
+    NotaFiscalSerializer, RegistrarPagamentoSerializer, ScanNotaSerializer,
 )
 from apps.fiscal.services.consolidacao import consolidado_via_orm, resumo_mercado_do_mes
 from apps.fiscal.services.sefaz_ba import importar_nota
+
+from apps.common.datas import hoje_local
+
 
 
 class NotaFiscalViewSet(WorkspaceViewSet):
@@ -93,7 +95,6 @@ class NotaFiscalViewSet(WorkspaceViewSet):
         a view ainda não foi criada, cai no agregado via ORM — mesmo resultado,
         só mais lento. Isso evita que o endpoint quebre em desenvolvimento.
         """
-        from django.db import DatabaseError
 
         workspace = workspace_do_request(request)
         inicio = request.query_params.get("inicio")
@@ -115,4 +116,70 @@ class NotaFiscalViewSet(WorkspaceViewSet):
     def mes_corrente(self, request):
         """Total do mês atual em tempo real, sem depender do refresh da view."""
         workspace = workspace_do_request(request)
-        return Response(resumo_mercado_do_mes(workspace, date.today().replace(day=1)))
+        return Response(resumo_mercado_do_mes(workspace, hoje_local().replace(day=1)))
+
+    @action(detail=True, methods=["get", "post"])
+    def pagamento(self, request, pk=None):
+        """
+        Como a nota foi paga.
+
+        GET  devolve a sugestão: forma vinda da nota, cartão e parcelamento
+             vindos do histórico do estabelecimento.
+        POST registra e gera o lançamento — Realizado à vista, Compra com
+             parcelas no crédito.
+        """
+        from apps.fiscal.services.pagamento import registrar_pagamento, sugerir_pagamento
+
+        nota = self.get_object()
+
+        if request.method == "GET":
+            return Response(sugerir_pagamento(nota))
+
+        serializer = RegistrarPagamentoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dados = serializer.validated_data
+
+        try:
+            resultado = registrar_pagamento(
+                nota=nota,
+                forma=dados["forma"],
+                valor=dados.get("valor"),
+                cartao=dados.get("cartao"),
+                parcelas=dados.get("parcelas", 1),
+                categoria=dados.get("categoria"),
+                autorizacao=dados.get("autorizacao", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "nota": str(nota.id),
+            "forma": dados["forma"],
+            "compra": str(resultado["compra"].id) if resultado["compra"] else None,
+            "parcelas_geradas": (
+                resultado["compra"].parcelas.count() if resultado["compra"] else 0
+            ),
+            "realizado": (
+                str(resultado["realizado"].id) if resultado["realizado"] else None
+            ),
+        })
+
+    @action(detail=False, methods=["get"], url_path="sem-pagamento")
+    def sem_pagamento(self, request):
+        """
+        Notas lidas sem forma de pagamento informada.
+
+        O scan é rápido de propósito — a pessoa está no caixa. Esta fila é a
+        consequência, e precisa ser visível: sem isso as notas se acumulam
+        fora do fluxo de caixa sem ninguém notar.
+        """
+        from apps.fiscal.services.pagamento import notas_sem_pagamento
+
+        pendentes = notas_sem_pagamento(workspace_do_request(request))
+        return Response({
+            "total": pendentes.count(),
+            "valor_total": str(
+                sum((n.valor_total for n in pendentes), __import__("decimal").Decimal("0"))
+            ),
+            "notas": NotaFiscalResumoSerializer(pendentes[:100], many=True).data,
+        })

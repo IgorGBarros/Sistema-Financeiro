@@ -1,7 +1,10 @@
 from rest_framework import serializers
 
 from apps.catalogo.models import Categoria
-from apps.fiscal.models import ConsolidadoMercado, ItemNotaFiscal, NotaFiscal
+from apps.cartoes.models import Cartao
+from apps.fiscal.models import (
+    ConsolidadoMercado, FormaPagamento, ItemNotaFiscal, NotaFiscal, PagamentoNota,
+)
 from apps.fiscal.services.nfce_qrcode import QRCodeInvalido, parse_qrcode
 
 
@@ -14,8 +17,56 @@ class ItemNotaFiscalSerializer(serializers.ModelSerializer):
         ]
 
 
+class PagamentoNotaSerializer(serializers.ModelSerializer):
+    cartao_apelido = serializers.CharField(
+        source="cartao.apelido", read_only=True, default=None
+    )
+
+    class Meta:
+        model = PagamentoNota
+        fields = [
+            "id", "forma", "valor", "cartao", "cartao_apelido", "parcelas",
+            "bandeira", "autorizacao", "confirmado",
+        ]
+        read_only_fields = fields
+
+
+class RegistrarPagamentoSerializer(serializers.Serializer):
+    """
+    Entrada da tela de confirmação do scan.
+
+    `forma` vem sugerida pela nota; `cartao` e `parcelas` o usuário informa —
+    a NFC-e não traz parcelamento.
+    """
+
+    forma = serializers.ChoiceField(choices=FormaPagamento.choices)
+    valor = serializers.DecimalField(
+        max_digits=14, decimal_places=2, required=False, allow_null=True
+    )
+    cartao = serializers.PrimaryKeyRelatedField(
+        queryset=Cartao.objects.all(), required=False, allow_null=True
+    )
+    parcelas = serializers.IntegerField(min_value=1, max_value=36, default=1)
+    categoria = serializers.PrimaryKeyRelatedField(
+        queryset=Categoria.objects.all(), required=False, allow_null=True
+    )
+    autorizacao = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs["forma"] == FormaPagamento.CREDITO and not attrs.get("cartao"):
+            raise serializers.ValidationError(
+                {"cartao": "Pagamento no crédito precisa de um cartão."}
+            )
+        if attrs["forma"] != FormaPagamento.CREDITO and attrs.get("parcelas", 1) > 1:
+            raise serializers.ValidationError(
+                {"parcelas": "Só pagamento no crédito pode ser parcelado."}
+            )
+        return attrs
+
+
 class NotaFiscalSerializer(serializers.ModelSerializer):
     itens = ItemNotaFiscalSerializer(many=True, read_only=True)
+    pagamentos = PagamentoNotaSerializer(many=True, read_only=True)
     competencia = serializers.DateField(read_only=True)
 
     class Meta:
@@ -25,7 +76,8 @@ class NotaFiscalSerializer(serializers.ModelSerializer):
             "cnpj_emitente", "nome_emitente", "municipio", "data_emissao",
             "competencia", "valor_total", "valor_desconto", "valor_tributos",
             "quantidade_itens", "forma_pagamento", "protocolo", "categoria",
-            "status", "erro_consulta", "qr_url", "itens", "criado_em",
+            "status", "erro_consulta", "qr_url", "itens", "pagamentos",
+            "criado_em",
         ]
         read_only_fields = fields
 

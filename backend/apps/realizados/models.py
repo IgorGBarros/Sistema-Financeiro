@@ -8,7 +8,7 @@ que foi planejado e o que aconteceu.
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from apps.common.models import Base, EscopoWorkspace, OrigemLancamento, TipoLancamento
+from apps.common.models import EscopoWorkspace, OrigemLancamento, TipoLancamento
 
 
 class Realizado(EscopoWorkspace):

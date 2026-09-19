@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
@@ -10,8 +11,10 @@ import { api, type LinhaFluxo } from "@/shared/lib/api";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Card, CardContent } from "@/shared/ui/card";
+import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
+import { Kpi } from "@/shared/components/Kpi";
+import { cn } from "@/shared/lib/utils";
 
 const ScannerNota = lazy(() =>
   import("@/features/fiscal/components/ScannerNota").then((m) => ({ default: m.ScannerNota })),
@@ -61,90 +64,68 @@ export default function FluxoCaixa() {
   const primeiroNegativo = dados.find((d) => d.saldo < 0);
 
   return (
-    <div className="space-y-6 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Fluxo de caixa</h1>
-          <p className="text-sm text-muted-foreground">
-            Meses passados mostram o que foi pago. Meses à frente mostram a projeção
-            dos contratos.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Tabs value={String(horizonte)} onValueChange={(v) => setHorizonte(Number(v))}>
-            <TabsList>
+    <div className="p-container-padding">
+      <CabecalhoPagina
+        titulo="Fluxo de caixa"
+        descricao="Meses passados mostram o que foi pago. Meses à frente, a projeção dos contratos."
+        acoes={
+          <>
+            <div className="flex gap-1 rounded-lg bg-surface-container-low p-1">
               {HORIZONTES.map((h) => (
-                <TabsTrigger key={h.meses} value={String(h.meses)}>
+                <button
+                  key={h.meses}
+                  onClick={() => setHorizonte(h.meses)}
+                  className={cn(
+                    "rounded px-3 py-1 text-body-sm transition-colors",
+                    horizonte === h.meses
+                      ? "bg-surface-container-lowest font-semibold text-on-surface shadow-sm"
+                      : "text-on-surface-variant hover:text-on-surface",
+                  )}
+                >
                   {h.rotulo}
-                </TabsTrigger>
+                </button>
               ))}
-            </TabsList>
-          </Tabs>
-          <Button onClick={() => setScannerAberto(true)}>
-            <ScanLine className="mr-2 h-4 w-4" />
-            Ler cupom
-          </Button>
-        </div>
-      </header>
+            </div>
+            <Button onClick={() => setScannerAberto(true)}>
+              <ScanLine className="mr-2 h-4 w-4" />
+              Ler cupom
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Saldo ao fim do período
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">
-              {fluxo.data ? formatarMoeda(fluxo.data.totais.saldo_final) : "—"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Mercado neste mês
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">
-              {mercado.data ? formatarMoeda(mercado.data.valor_total) : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {mercado.data?.quantidade_notas ?? 0} cupom(ns) lidos · ticket médio{" "}
-              {mercado.data ? formatarMoeda(mercado.data.ticket_medio) : "—"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={primeiroNegativo ? "border-destructive" : undefined}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {primeiroNegativo ? "Saldo fica negativo em" : "Saldo positivo no período"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2">
-            {primeiroNegativo ? (
-              <>
-                <TrendingDown className="h-5 w-5 text-destructive" />
-                <p className="text-2xl font-semibold">{primeiroNegativo.mes}</p>
-              </>
-            ) : (
-              <>
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
-                <p className="text-2xl font-semibold">Sem furo previsto</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
+        <Kpi
+          rotulo="Saldo ao fim do período"
+          valor={fluxo.data ? formatarMoeda(fluxo.data.totais.saldo_final) : "—"}
+          icone={TrendingUp}
+          tom={
+            fluxo.data && Number(fluxo.data.totais.saldo_final) < 0 ? "despesa" : "receita"
+          }
+          carregando={fluxo.isLoading}
+        />
+        <Kpi
+          rotulo="Mercado neste mês"
+          valor={mercado.data ? formatarMoeda(mercado.data.valor_total) : "—"}
+          icone={ScanLine}
+          apoio={
+            mercado.data
+              ? `${mercado.data.quantidade_notas} cupom(ns) · média ${formatarMoeda(mercado.data.ticket_medio)}`
+              : undefined
+          }
+          carregando={mercado.isLoading}
+        />
+        <Kpi
+          rotulo={primeiroNegativo ? "Saldo fica negativo em" : "Saldo positivo no período"}
+          valor={primeiroNegativo ? primeiroNegativo.mes : "Sem furo previsto"}
+          icone={primeiroNegativo ? TrendingDown : TrendingUp}
+          tom={primeiroNegativo ? "despesa" : "receita"}
+          carregando={fluxo.isLoading}
+        />
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Receitas, despesas e saldo acumulado</CardTitle>
-        </CardHeader>
-        <CardContent className="h-[380px]">
+        <CardContent className="h-[380px] pt-6">
           {fluxo.isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Carregando a projeção…
@@ -155,7 +136,7 @@ export default function FluxoCaixa() {
                 Nenhum contrato cadastrado ainda.
               </p>
               <Button variant="outline" asChild>
-                <a href="/contratos/novo">Cadastrar a primeira entrada ou saída</a>
+                <Link to="/contratos">Cadastrar a primeira entrada ou saída</Link>
               </Button>
             </div>
           ) : (
@@ -174,13 +155,13 @@ export default function FluxoCaixa() {
                   labelClassName="font-medium"
                 />
                 <Legend />
-                <Bar dataKey="receita" name="Receita" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="receita" name="Receita" fill="var(--receita)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesa" name="Despesa" fill="var(--despesa)" radius={[4, 4, 0, 0]} />
                 <Line
                   type="monotone"
                   dataKey="saldo"
                   name="Saldo acumulado"
-                  stroke="#0ea5e9"
+                  stroke="var(--secondary)"
                   strokeWidth={2}
                   dot={false}
                 />

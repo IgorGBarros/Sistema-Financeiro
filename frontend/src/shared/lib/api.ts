@@ -88,6 +88,7 @@ export interface NotaFiscal {
   status: "PENDENTE" | "IMPORTADA" | "ERRO" | "MANUAL";
   erro_consulta: string;
   itens?: ItemNota[];
+  pagamentos?: PagamentoNota[];
   detail?: string;
 }
 
@@ -123,6 +124,310 @@ export interface Parcela {
   valor_previsto: string;
   quantidade_planejada: number;
   pago: boolean;
+}
+
+export interface Previsao {
+  competencia_inicial: string;
+  horizonte: number;
+  modelo: {
+    nome: string;
+    descricao: string;
+    motivo: string;
+    confiavel: boolean;
+    observacoes: number;
+    erro_medio: string | null;
+    ganho_sobre_ingenuo: number | null;
+    candidatos: {
+      modelo: string;
+      descricao: string;
+      erro_medio: string;
+      avaliacoes: number;
+    }[];
+  };
+  meses: {
+    competencia: string;
+    contratado: string;
+    estimado: string;
+    resultado_p50: string;
+    saldo_p10: string;
+    saldo_p50: string;
+    saldo_p90: string;
+    probabilidade_negativo: number;
+  }[];
+  risco: {
+    probabilidade_algum_mes_negativo: number;
+    primeiro_mes_de_risco: string | null;
+    saldo_final_p10: string;
+    saldo_final_p50: string;
+    saldo_final_p90: string;
+    cenarios_simulados: number;
+    confiavel: boolean;
+  };
+  resumo: string;
+  aviso: string | null;
+}
+
+export interface LinhaConfronto {
+  competencia: string;
+  fechada: boolean;
+  receita_prevista: string;
+  receita_realizada: string;
+  receita_efetiva: string;
+  receita_desvio: string;
+  despesa_prevista: string;
+  despesa_realizada: string;
+  despesa_efetiva: string;
+  despesa_desvio: string;
+  resultado_efetivo: string;
+  saldo_acumulado: string;
+}
+
+export interface Confronto {
+  meses: string[];
+  linhas: LinhaConfronto[];
+  competencia_corrente: string;
+}
+
+export interface SaldoARealizar {
+  competencia_corrente: string;
+  total_em_aberto: string;
+  linhas: {
+    contrato: string;
+    descricao: string;
+    estabelecimento: string;
+    tipo: TipoLancamento;
+    previsto_total: string;
+    previsto_ate_agora: string;
+    realizado: string;
+    em_aberto: string;
+    saldo_futuro: string;
+  }[];
+}
+
+export interface MatrizContratos {
+  agrupamento: string;
+  meses: string[];
+  linhas: {
+    id: string;
+    nome: string;
+    tipo: TipoLancamento | "MISTO";
+    valores: Record<string, string>;
+    total: string;
+  }[];
+  totais: Record<string, string>;
+  acumulado: Record<string, string>;
+  total_geral: string;
+}
+
+export interface PainelCartoes {
+  meses: string[];
+  linhas: {
+    id: string;
+    apelido: string;
+    bandeira: string;
+    ultimos_digitos: string;
+    dia_fechamento: number;
+    dia_vencimento: number;
+    proximo_vencimento: string;
+    valores: Record<string, string>;
+    total_periodo: string;
+    limite: string | null;
+    comprometido: string;
+    disponivel: string | null;
+    utilizacao_pct: string | null;
+  }[];
+  totais: Record<string, string>;
+  resumo: {
+    limite_total: string;
+    comprometido_total: string;
+    disponivel_total: string;
+    utilizacao_pct: string | null;
+    cartoes_ativos: number;
+  };
+}
+
+export interface PagamentoNota {
+  id: string;
+  forma: string;
+  valor: string;
+  cartao: string | null;
+  cartao_apelido: string | null;
+  parcelas: number;
+  bandeira: string;
+  autorizacao: string;
+  confirmado: boolean;
+}
+
+export interface SugestaoPagamento {
+  forma: string;
+  valor: string;
+  cartao: string | null;
+  parcelas: number;
+  categoria: string | null;
+  origem_da_sugestao: "nota" | "historico" | "estabelecimento" | "nenhuma";
+}
+
+export interface Realizado {
+  id: string;
+  contrato: string | null;
+  contrato_descricao: string | null;
+  categoria: string;
+  categoria_nome: string;
+  descricao: string;
+  tipo: TipoLancamento;
+  competencia: string;
+  data_pagamento: string;
+  valor: string;
+  forma_pagamento: string;
+  origem: string;
+  observacao: string;
+}
+
+export interface Cartao {
+  id: string;
+  apelido: string;
+  bandeira: string;
+  ultimos_digitos: string;
+  emissor: string;
+  limite: string | null;
+  dia_fechamento: number;
+  dia_vencimento: number;
+  cartao_titular: string | null;
+  ativo: boolean;
+}
+
+export interface Compra {
+  id: string;
+  nota: string | null;
+  cartao: string;
+  cartao_apelido: string;
+  estabelecimento: string;
+  estabelecimento_nome: string;
+  categoria: string;
+  categoria_nome: string;
+  descricao: string;
+  data_compra: string;
+  valor_total: string;
+  parcelas_total: number;
+  parcelas: { id: string; numero: number; competencia: string; valor: string; conciliada_em: string | null }[];
+}
+
+export interface LancamentoFatura {
+  id: string;
+  descricao: string;
+  descricao_original: string;
+  data_compra: string | null;
+  valor: string;
+  parcela_atual: number | null;
+  parcela_total: number | null;
+  secao: "CORRENTE" | "FUTURA";
+  conciliado: boolean;
+  metodo_conciliacao: string;
+  estabelecimento: string | null;
+  estabelecimento_nome: string | null;
+  categoria: string | null;
+}
+
+export interface Fatura {
+  id: string;
+  cartao: string;
+  cartao_apelido: string;
+  competencia: string;
+  data_vencimento: string;
+  valor_total_informado: string;
+  status: string;
+  lancamentos: LancamentoFatura[];
+}
+
+export interface ParcelaFinanciamento {
+  id: string;
+  numero: number;
+  competencia: string;
+  vencimento: string;
+  valor_total: string;
+  situacao: "PAGA" | "ABERTA" | "PROJETADA" | "VENCIDA";
+  amortizacao: string;
+  juros: string;
+  seguro_mip: string;
+  seguro_dfi: string;
+  taxa_administracao: string;
+  encargos: string;
+  saldo_devedor: string;
+}
+
+export interface Financiamento {
+  id: string;
+  numero_contrato: string;
+  instituicao: string;
+  titular: string;
+  paga_do_proprio_bolso: boolean;
+  sistema_amortizacao: string;
+  prazo_total: number | null;
+  taxa_juros_anual: string;
+  data_ultima_parcela: string | null;
+  parcelas_pagas: number;
+  parcelas_restantes: number;
+  saldo_devedor_atual: string | null;
+  total_a_pagar: string;
+  juros_a_pagar: string;
+  proxima_parcela: ParcelaFinanciamento | null;
+}
+
+export interface Verba {
+  id: string;
+  codigo: string;
+  descricao: string;
+  referencia: string | null;
+  valor: string;
+  natureza: "VENCIMENTO" | "DESCONTO";
+}
+
+export interface Holerite {
+  id: string;
+  empregador_nome: string;
+  funcionario: string;
+  competencia: string;
+  tipo_folha: string;
+  total_vencimentos: string;
+  total_descontos: string;
+  valor_liquido: string;
+  salario_base: string | null;
+  base_inss: string | null;
+  base_fgts: string | null;
+  fgts_mes: string | null;
+  conferencia_ok: boolean;
+  integrado: boolean;
+  verbas: Verba[];
+}
+
+export interface ContaConsumo {
+  id: string;
+  unidade: string;
+  unidade_apelido: string;
+  competencia: string;
+  vencimento: string | null;
+  valor_total: string;
+  consumo: string | null;
+  leitura_anterior: string | null;
+  leitura_atual: string | null;
+  dias_faturados: number | null;
+  tarifa_media: string | null;
+  itens: { id: string; descricao: string; valor: string }[];
+}
+
+export interface DocumentoImportado {
+  id: string;
+  nome_arquivo: string;
+  tipo: string;
+  status: string;
+  competencia: string | null;
+  vencimento: string | null;
+  valor_total: string | null;
+  emitente: string;
+  avisos: string[];
+  erro: string;
+  linhas?: { id: string; descricao: string; valor: string; data: string | null }[];
+  resultado?: Record<string, unknown> | null;
 }
 
 export interface LinhaFluxo {
@@ -233,6 +538,43 @@ async function lista<T>(caminho: string): Promise<T[]> {
   return Array.isArray(corpo) ? corpo : corpo.results;
 }
 
+/**
+ * Igual ao `request`, mas sem forçar Content-Type.
+ *
+ * Em multipart o navegador precisa definir o cabeçalho sozinho, porque ele
+ * inclui o boundary. Definir "application/json" ali faz o servidor receber um
+ * corpo que não consegue interpretar.
+ */
+async function requestBruto<T>(caminho: string, init: RequestInit): Promise<T> {
+  const token = await obterToken();
+  const workspace = localStorage.getItem("workspace_id");
+
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${BASE_URL}${caminho}`, {
+      ...init,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(workspace ? { "X-Workspace": workspace } : {}),
+        ...init.headers,
+      },
+    });
+  } catch {
+    throw new ApiError("Sem conexão com o servidor. Verifique sua internet.", 0);
+  }
+
+  const corpo = await resposta.json().catch(() => null);
+  if (!resposta.ok) {
+    const envelope = (corpo ?? {}) as { campos?: Record<string, string[]> };
+    throw new ApiError(
+      extrairMensagem(resposta.status, corpo),
+      resposta.status,
+      envelope.campos ?? {},
+    );
+  }
+  return corpo as T;
+}
+
 const qs = (params: Record<string, string | undefined>) =>
   new URLSearchParams(
     Object.entries(params).filter(([, v]) => v != null) as [string, string][],
@@ -294,6 +636,164 @@ export const api = {
     request<{ valor_total: string; quantidade_notas: number; ticket_medio: string }>(
       "/notas/mes-corrente/",
     ),
+
+  previsao: (horizonte = 12, saldoInicial = "0") =>
+    request<Previsao>(
+      `/previsao/?${qs({ horizonte: String(horizonte), saldo_inicial: saldoInicial })}`,
+    ),
+  modelosPrevisao: () =>
+    request<{
+      meses_de_historico: number;
+      modelos: {
+        nome: string;
+        descricao: string;
+        minimo_observacoes: number;
+        disponivel: boolean;
+      }[];
+    }>("/previsao/modelos/"),
+
+  confronto: (inicio: string, fim: string) =>
+    request<Confronto>(`/confronto/?${qs({ inicio, fim })}`),
+  saldoARealizar: () => request<SaldoARealizar>("/saldo-a-realizar/"),
+
+  matrizContratos: (inicio: string, fim: string, agrupar_por = "estabelecimento") =>
+    request<MatrizContratos>(
+      `/matriz-contratos/?${qs({ inicio, fim, agrupar_por })}`,
+    ),
+  // --- plano de contas -----------------------------------------------------
+  salvarClassificacao: (dados: Partial<Classificacao>, id?: string) =>
+    request<Classificacao>(id ? `/classificacoes/${id}/` : "/classificacoes/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  salvarCategoria: (dados: Partial<Categoria>, id?: string) =>
+    request<Categoria>(id ? `/categorias/${id}/` : "/categorias/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  salvarEstabelecimento: (dados: Partial<Estabelecimento>, id?: string) =>
+    request<Estabelecimento>(id ? `/estabelecimentos/${id}/` : "/estabelecimentos/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+
+  // --- realizados ----------------------------------------------------------
+  realizados: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Realizado>(`/realizados/?${qs(filtros)}`),
+  salvarRealizado: (dados: Partial<Realizado>, id?: string) =>
+    request<Realizado>(id ? `/realizados/${id}/` : "/realizados/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+
+  // --- pagamento da nota ---------------------------------------------------
+  sugestaoPagamento: (notaId: string) =>
+    request<SugestaoPagamento>(`/notas/${notaId}/pagamento/`),
+  registrarPagamento: (
+    notaId: string,
+    dados: {
+      forma: string;
+      valor?: string;
+      cartao?: string | null;
+      parcelas?: number;
+      categoria?: string | null;
+    },
+  ) =>
+    request<{
+      nota: string;
+      forma: string;
+      compra: string | null;
+      parcelas_geradas: number;
+      realizado: string | null;
+    }>(`/notas/${notaId}/pagamento/`, { method: "POST", body: JSON.stringify(dados) }),
+  notasSemPagamento: () =>
+    request<{ total: number; valor_total: string; notas: NotaFiscal[] }>(
+      "/notas/sem-pagamento/",
+    ),
+
+  // --- documentos ----------------------------------------------------------
+  tiposDocumento: () =>
+    request<{ tipo: string; nome: string }[]>("/documentos/tipos/"),
+  documento: (id: string) => request<DocumentoImportado>(`/documentos/${id}/`),
+  reprocessarDocumento: (id: string) =>
+    request<DocumentoImportado>(`/documentos/${id}/reprocessar/`, { method: "POST" }),
+
+  // --- conciliação ---------------------------------------------------------
+  duplicidadesFinanciamento: (id: string) =>
+    request<{ duplicidades: Record<string, string>[] }>(
+      `/financiamentos/${id}/duplicidades/`,
+    ),
+  simularVinculoRealizados: () =>
+    request<{
+      vinculados: Record<string, string>[];
+      sem_correspondencia: Record<string, string>[];
+      total_orfaos: number;
+    }>("/vincular-realizados/"),
+  aplicarVinculoRealizados: () =>
+    request<{ vinculados: Record<string, string>[] }>("/vincular-realizados/", {
+      method: "POST",
+    }),
+
+  cartoes: () => lista<Cartao>("/cartoes/"),
+  compras: () => lista<Compra>("/compras/"),
+  unidadesConsumidoras: () =>
+    lista<{
+      id: string;
+      servico: string;
+      codigo_cliente: string;
+      apelido: string;
+      concessionaria: string;
+      contrato: string | null;
+    }>("/unidades-consumidoras/"),
+  salvarCartao: (dados: Partial<Cartao>, id?: string) =>
+    request<Cartao>(id ? `/cartoes/${id}/` : "/cartoes/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+
+  faturas: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Fatura>(`/faturas/?${qs(filtros)}`),
+  fatura: (id: string) => request<Fatura>(`/faturas/${id}/`),
+  pendenciasFatura: (id: string) =>
+    request<{ total: number; sem_categoria: number; lancamentos: LancamentoFatura[] }>(
+      `/faturas/${id}/pendencias/`,
+    ),
+
+  financiamentos: () => lista<Financiamento>("/financiamentos/"),
+  parcelasFinanciamento: (id: string, situacao?: string) =>
+    request<ParcelaFinanciamento[]>(
+      `/financiamentos/${id}/parcelas/?${qs({ situacao })}`,
+    ),
+
+  holerites: () => lista<Holerite>("/holerites/"),
+  contasConsumo: () => lista<ContaConsumo>("/contas-consumo/"),
+  historicoConsumo: () =>
+    request<
+      { competencia: string; valor: string; consumo: string | null; tarifa_media: string | null }[]
+    >("/contas-consumo/historico/"),
+
+  painelCartoes: (inicio: string, fim: string) =>
+    request<PainelCartoes>(`/cartoes/painel/?${qs({ inicio, fim })}`),
+
+  /**
+   * Envia um PDF. Vai como multipart, então não passa pelo `request()`, que
+   * força Content-Type JSON.
+   */
+  importarDocumento: async (
+    arquivo: File,
+    opcoes: { senha?: string; tipo?: string; simular?: boolean } = {},
+  ): Promise<DocumentoImportado> => {
+    const corpo = new FormData();
+    corpo.append("arquivo", arquivo);
+    if (opcoes.senha) corpo.append("senha", opcoes.senha);
+    if (opcoes.tipo) corpo.append("tipo", opcoes.tipo);
+    corpo.append("simular", String(Boolean(opcoes.simular)));
+    return requestBruto<DocumentoImportado>("/documentos/importar/", {
+      method: "POST",
+      body: corpo,
+    });
+  },
+  documentos: () => lista<DocumentoImportado>("/documentos/"),
 
   fluxoCaixa: (inicio: string, fim: string, saldoInicial = "0") =>
     request<{ linhas: LinhaFluxo[]; totais: Record<string, string> }>(

@@ -38,3 +38,4 @@ CORS_ALLOW_HEADERS = [
 ]
 
 LOGGING["root"]["level"] = "DEBUG"  # noqa: F405
+# Mesmo em DEBUG, o pdfminer continua silenciado — ver base.py.

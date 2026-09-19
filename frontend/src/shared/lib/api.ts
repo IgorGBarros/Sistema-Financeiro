@@ -684,23 +684,6 @@ export const api = {
     request<MatrizContratos>(
       `/matriz-contratos/?${qs({ inicio, fim, agrupar_por })}`,
     ),
-  // --- plano de contas -----------------------------------------------------
-  salvarClassificacao: (dados: Partial<Classificacao>, id?: string) =>
-    request<Classificacao>(id ? `/classificacoes/${id}/` : "/classificacoes/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  salvarCategoria: (dados: Partial<Categoria>, id?: string) =>
-    request<Categoria>(id ? `/categorias/${id}/` : "/categorias/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  salvarEstabelecimento: (dados: Partial<Estabelecimento>, id?: string) =>
-    request<Estabelecimento>(id ? `/estabelecimentos/${id}/` : "/estabelecimentos/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-
   // --- realizados ----------------------------------------------------------
   realizados: (filtros: Record<string, string | undefined> = {}) =>
     lista<Realizado>(`/realizados/?${qs(filtros)}`),
@@ -709,6 +692,8 @@ export const api = {
       method: id ? "PATCH" : "POST",
       body: JSON.stringify(dados),
     }),
+  deletarRealizado: (id: string) =>
+    request<void>(`/realizados/${id}/`, { method: "DELETE" }),
 
   // --- pagamento da nota ---------------------------------------------------
   sugestaoPagamento: (notaId: string) =>

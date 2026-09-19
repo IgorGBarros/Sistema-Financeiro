@@ -1,11 +1,19 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import Assistente from "@/features/assistente/Assistente";
-import Catalogo from "@/features/catalogo/Catalogo";
+import Cartoes from "@/features/cartoes/Cartoes";
+import Fatura from "@/features/cartoes/Fatura";
+import Contas from "@/features/contas/Contas";
 import Contratos from "@/features/contratos/Contratos";
-import FluxoCaixa from "@/features/fluxo/FluxoCaixa";
-import Notas from "@/features/fiscal/Notas";
+import Documentos from "@/features/documentos/Documentos";
+import PlanoDeContas from "@/features/catalogo/PlanoDeContas";
+import Catalogo from "@/features/catalogo/Catalogo";
 import Realizados from "@/features/realizados/Realizados";
+import Financiamento from "@/features/financiamento/Financiamento";
+import Notas from "@/features/fiscal/Notas";
+import Previsao from "@/features/previsao/Previsao";
+import FluxoCaixa from "@/features/fluxo/FluxoCaixa";
+import Folha from "@/features/folha/Folha";
 import { AppShell } from "@/shared/components/AppShell";
 
 export default function App() {
@@ -14,10 +22,18 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/fluxo" replace />} />
         <Route path="/fluxo" element={<FluxoCaixa />} />
+        <Route path="/previsao" element={<Previsao />} />
         <Route path="/contratos" element={<Contratos />} />
-        <Route path="/realizados" element={<Realizados />} />
+        <Route path="/cartoes" element={<Cartoes />} />
+        <Route path="/faturas/:id" element={<Fatura />} />
+        <Route path="/lancamentos" element={<Realizados />} />
         <Route path="/notas" element={<Notas />} />
+        <Route path="/documentos" element={<Documentos />} />
+        <Route path="/plano-de-contas" element={<PlanoDeContas />} />
         <Route path="/catalogo" element={<Catalogo />} />
+        <Route path="/financiamento" element={<Financiamento />} />
+        <Route path="/folha" element={<Folha />} />
+        <Route path="/contas" element={<Contas />} />
         <Route path="/assistente" element={<Assistente />} />
         <Route
           path="*"

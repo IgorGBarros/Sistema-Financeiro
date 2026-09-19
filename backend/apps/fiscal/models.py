@@ -138,3 +138,64 @@ class ConsolidadoMercado(models.Model):
         managed = False
         db_table = "vw_mercado_consolidado"
         ordering = ["-competencia"]
+
+
+class FormaPagamento(models.TextChoices):
+    """Formas do campo tPag da NFC-e, mais as que aparecem na prática."""
+
+    DINHEIRO = "DINHEIRO", "Dinheiro"
+    CHEQUE = "CHEQUE", "Cheque"
+    CREDITO = "CREDITO", "Cartão de crédito"
+    DEBITO = "DEBITO", "Cartão de débito"
+    CREDITO_LOJA = "CREDITO_LOJA", "Crédito da loja"
+    VALE_ALIMENTACAO = "VALE_ALIMENTACAO", "Vale alimentação"
+    VALE_REFEICAO = "VALE_REFEICAO", "Vale refeição"
+    PIX = "PIX", "PIX"
+    BOLETO = "BOLETO", "Boleto"
+    OUTRO = "OUTRO", "Outro"
+
+
+class PagamentoNota(Base):
+    """
+    Como a nota foi paga.
+
+    É tabela e não campo porque a NFC-e admite pagamento dividido: parte no
+    cartão, parte em dinheiro. Um campo único forçaria escolher uma forma e
+    perder a outra.
+
+    O que vem da nota: forma, valor, bandeira e autorização.
+    O que o usuário informa: qual cartão e quantas parcelas — **a NFC-e não
+    traz o número de parcelas.** O layout 4.00 tem `indPag`, que só diz "à
+    vista" ou "a prazo"; parcelamento aparece no grupo `cobr/dup`, que é da
+    NF-e modelo 55 e raramente vem no cupom modelo 65.
+    """
+
+    nota = models.ForeignKey(
+        "fiscal.NotaFiscal", on_delete=models.CASCADE, related_name="pagamentos"
+    )
+    forma = models.CharField(max_length=20, choices=FormaPagamento.choices)
+    valor = models.DecimalField(max_digits=14, decimal_places=2)
+
+    cartao = models.ForeignKey(
+        "cartoes.Cartao", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="pagamentos",
+    )
+    parcelas = models.PositiveSmallIntegerField(default=1)
+    bandeira = models.CharField(max_length=20, blank=True)
+    autorizacao = models.CharField(
+        max_length=30, blank=True,
+        help_text="cAut da NFC-e. Quando a fatura também traz, a conciliação vira exata.",
+    )
+    # Enquanto for False, a nota aparece na lista de pendências: foi lida, mas
+    # ninguém disse ainda como foi paga.
+    confirmado = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.get_forma_display()} — {self.valor}"
+
+    @property
+    def gera_compra_no_cartao(self) -> bool:
+        return self.forma == FormaPagamento.CREDITO and self.cartao_id is not None

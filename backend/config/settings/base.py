@@ -35,6 +35,13 @@ APPS_PROJETO = [
     "apps.realizados",
     "apps.fiscal",
     "apps.relatorios",
+    # Importação de documentos e os domínios que ela alimenta
+    "apps.documentos",
+    "apps.cartoes",
+    "apps.contas",
+    "apps.financiamento",
+    "apps.folha",
+    "apps.previsao",
     "apps.assistente",
 ]
 
@@ -120,4 +127,11 @@ LOGGING = {
     },
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "padrao"}},
     "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        # O pdfminer, que o pdfplumber usa por baixo, emite uma linha de DEBUG
+        # por token do PDF. Em DEBUG=1 isso são milhares de linhas por
+        # documento, e a saída útil some no meio.
+        "pdfminer": {"level": "WARNING", "propagate": False},
+        "pdfplumber": {"level": "WARNING", "propagate": False},
+    },
 }

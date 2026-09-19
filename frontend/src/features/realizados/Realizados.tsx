@@ -1,287 +1,340 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertCircle,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Pencil,
-  Plus,
-  TrendingUp,
-  Trash2,
-} from "lucide-react";
+import { CalendarCheck, Check, CircleDollarSign, Clock, Wallet } from "lucide-react";
 
-import { api, type Realizado, type TipoLancamento } from "@/shared/lib/api";
+import { api, ApiError, type Parcela } from "@/shared/lib/api";
+import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Kpi } from "@/shared/components/Kpi";
-import { ModalConfirmacao } from "@/shared/components/ModalConfirmacao";
+import { Selo } from "@/shared/components/Selo";
 import { Button } from "@/shared/ui/button";
+import { Card, CardContent } from "@/shared/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
 import { useToast } from "@/shared/ui/use-toast";
 import { cn } from "@/shared/lib/utils";
-import { FormularioRealizado } from "./components/FormularioRealizado";
 
-type Filtro = "TODOS" | TipoLancamento;
+const iso = (data: Date) => data.toISOString().slice(0, 10);
 
-function formatarMoeda(valor: string | number): string {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    Number(valor),
+const dataCurta = (valor: string) =>
+  new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(
+    new Date(`${valor}T12:00:00`),
   );
-}
 
-function formatarData(data: string): string {
-  const [ano, mes, dia] = data.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
-function formatarCompetencia(data: string): string {
-  const [ano, mes] = data.split("-");
-  return `${mes}/${ano}`;
-}
-
+/**
+ * A tela que faltava para o sistema ter dados de realizado.
+ *
+ * Sem ela, a projeção existia mas nada nunca virava "aconteceu" — e o
+ * confronto previsto × realizado, a aderência e a previsão estatística ficavam
+ * todos vazios, porque todos dependem de histórico realizado.
+ */
 export default function Realizados() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const [filtro, setFiltro] = useState<Filtro>("TODOS");
-  const [formularioAberto, setFormularioAberto] = useState(false);
-  const [emEdicao, setEmEdicao] = useState<Realizado | null>(null);
-  const [emExclusao, setEmExclusao] = useState<Realizado | null>(null);
-
-  // Busca do mês corrente por padrão
   const hoje = new Date();
-  const [mesRef] = useState(() => {
-    const m = String(hoje.getMonth() + 1).padStart(2, "0");
-    return `${hoje.getFullYear()}-${m}`;
+  const [mes, setMes] = useState(iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)));
+  const [baixando, setBaixando] = useState<Parcela | null>(null);
+
+  const parcelas = useQuery({
+    queryKey: ["parcelas", mes],
+    queryFn: () => api.parcelas({ competencia: mes }),
   });
 
   const realizados = useQuery({
-    queryKey: ["realizados", filtro, mesRef],
-    queryFn: () =>
-      api.realizados(
-        filtro === "TODOS"
-          ? { competencia: `${mesRef}-01` }
-          : { tipo: filtro, competencia: `${mesRef}-01` },
-      ),
+    queryKey: ["realizados", mes],
+    queryFn: () => api.realizados({ competencia: mes }),
   });
 
-  const indicadores = useMemo(() => {
-    const lista = realizados.data ?? [];
-    const soma = (tipo: TipoLancamento) =>
-      lista.filter((r) => r.tipo === tipo).reduce((t, r) => t + Number(r.valor), 0);
-    const receitas = soma("RECEITA");
-    const despesas = soma("DESPESA");
-    return { receitas, despesas, resultado: receitas - despesas };
-  }, [realizados.data]);
+  const { pendentes, pagas } = useMemo(() => {
+    const lista = parcelas.data ?? [];
+    return {
+      pendentes: lista.filter((p) => !p.pago),
+      pagas: lista.filter((p) => p.pago),
+    };
+  }, [parcelas.data]);
 
-  const lista = realizados.data ?? [];
+  const totalPendente = pendentes.reduce((t, p) => t + Number(p.valor_previsto), 0);
+  const totalPago = (realizados.data ?? []).reduce((t, r) => t + Number(r.valor), 0);
 
-  const deletar = useMutation({
-    mutationFn: (id: string) => api.deletarRealizado(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["realizados"] });
-      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-      toast({ title: "Lançamento removido" });
-      setEmExclusao(null);
-    },
-    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
-  function abrir(realizado: Realizado | null) {
-    setEmEdicao(realizado);
-    setFormularioAberto(true);
+  function mudarMes(passo: number) {
+    const [ano, m] = mes.split("-").map(Number);
+    setMes(iso(new Date(ano, m - 1 + passo, 1)));
   }
 
   return (
     <div className="p-container-padding">
       <CabecalhoPagina
-        titulo="Realizados"
-        descricao="O que efetivamente entrou e saiu. Compare com o previsto nos contratos."
+        titulo="Lançamentos"
+        descricao="Marque o que já foi pago ou recebido. É isto que alimenta a comparação com o previsto."
         acoes={
-          <Button onClick={() => abrir(null)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo lançamento
-          </Button>
+          <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1">
+            <Button variant="ghost" size="sm" onClick={() => mudarMes(-1)}>
+              ←
+            </Button>
+            <span className="min-w-28 text-center text-body-sm font-semibold">
+              {formatarCompetencia(mes)}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => mudarMes(1)}>
+              →
+            </Button>
+          </div>
         }
       />
 
       <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
         <Kpi
-          rotulo="Entradas no mês"
-          valor={formatarMoeda(indicadores.receitas)}
-          icone={ArrowDownToLine}
+          rotulo="A pagar ou receber"
+          valor={formatarMoeda(totalPendente)}
+          icone={Clock}
+          tom={totalPendente > 0 ? "despesa" : "neutro"}
+          apoio={`${pendentes.length} parcela(s) em aberto`}
+          carregando={parcelas.isLoading}
+        />
+        <Kpi
+          rotulo="Já lançado no mês"
+          valor={formatarMoeda(totalPago)}
+          icone={Check}
           tom="receita"
-          apoio={`${lista.filter((r) => r.tipo === "RECEITA").length} lançamento(s)`}
+          apoio={`${(realizados.data ?? []).length} lançamento(s)`}
           carregando={realizados.isLoading}
         />
         <Kpi
-          rotulo="Saídas no mês"
-          valor={formatarMoeda(indicadores.despesas)}
-          icone={ArrowUpFromLine}
-          tom="despesa"
-          apoio={`${lista.filter((r) => r.tipo === "DESPESA").length} lançamento(s)`}
-          carregando={realizados.isLoading}
-        />
-        <Kpi
-          rotulo="Resultado do mês"
-          valor={formatarMoeda(indicadores.resultado)}
-          icone={TrendingUp}
-          tom={indicadores.resultado >= 0 ? "receita" : "despesa"}
-          apoio={
-            indicadores.resultado >= 0 ? "Fechou positivo" : "Fechou negativo"
-          }
-          carregando={realizados.isLoading}
+          rotulo="Parcelas baixadas"
+          valor={`${pagas.length}/${(parcelas.data ?? []).length}`}
+          icone={CalendarCheck}
+          apoio="Do previsto para este mês"
+          carregando={parcelas.isLoading}
         />
       </div>
 
-      <div className="cartao overflow-hidden">
-        <div className="flex items-center justify-between border-b border-outline-variant bg-surface p-stack-md">
-          <h2 className="text-headline-sm text-on-surface">
-            Lançamentos — {formatarCompetencia(`${mesRef}-01`)}
-          </h2>
-          <div className="flex gap-1 rounded-lg bg-surface-container-low p-1">
-            {(["TODOS", "RECEITA", "DESPESA"] as const).map((valor) => (
-              <button
-                key={valor}
-                onClick={() => setFiltro(valor)}
-                className={cn(
-                  "rounded px-3 py-1 text-body-sm transition-colors",
-                  filtro === valor
-                    ? "bg-surface-container-lowest font-semibold text-on-surface shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface",
-                )}
-              >
-                {valor === "TODOS" ? "Todos" : valor === "RECEITA" ? "Entradas" : "Saídas"}
-              </button>
-            ))}
-          </div>
+      <section className="cartao mb-container-padding overflow-hidden">
+        <div className="border-b border-outline-variant bg-surface p-stack-md">
+          <h2 className="text-headline-sm text-on-surface">Previsto para este mês</h2>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            Cada parcela vem da vigência do contrato. Marcar como paga cria o
+            lançamento realizado com a data e o valor que realmente saíram.
+          </p>
         </div>
 
-        {realizados.isLoading ? (
+        {parcelas.isLoading ? (
           <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
             Carregando…
           </p>
-        ) : realizados.isError ? (
-          <div className="flex items-start gap-3 p-stack-md">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-error" />
-            <div>
-              <p className="text-body-md font-medium">A lista não carregou.</p>
-              <p className="text-body-sm text-on-surface-variant">
-                {(realizados.error as Error).message}
-              </p>
-            </div>
-          </div>
-        ) : lista.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 p-stack-lg text-center">
-            <p className="text-body-sm text-on-surface-variant">
-              Nenhum lançamento registrado neste mês.
-            </p>
-            <Button variant="outline" onClick={() => abrir(null)}>
-              Registrar o primeiro
-            </Button>
-          </div>
+        ) : (parcelas.data ?? []).length === 0 ? (
+          <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
+            Nenhuma parcela prevista para {formatarCompetencia(mes)}.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-outline-variant bg-surface-container-low">
                   <th className="rotulo px-gutter-table py-2">Descrição</th>
-                  <th className="rotulo px-gutter-table py-2">Categoria</th>
-                  <th className="rotulo px-gutter-table py-2">Pagamento</th>
-                  <th className="rotulo px-gutter-table py-2">Forma</th>
-                  <th className="rotulo px-gutter-table py-2 text-right">Valor</th>
-                  <th className="rotulo px-gutter-table py-2 text-center">Ações</th>
+                  <th className="rotulo w-20 px-gutter-table py-2">Vence</th>
+                  <th className="rotulo px-gutter-table py-2 text-right">Previsto</th>
+                  <th className="rotulo w-36 px-gutter-table py-2 text-center">Situação</th>
                 </tr>
               </thead>
               <tbody className="text-body-sm">
-                {lista.map((r) => {
-                  const receita = r.tipo === "RECEITA";
-                  return (
-                    <tr
-                      key={r.id}
-                      className="group h-[40px] border-b border-outline-variant transition-colors hover:bg-surface-container-low"
+                {(parcelas.data ?? []).map((parcela) => (
+                  <tr
+                    key={parcela.id}
+                    className={cn(
+                      "h-[40px] border-b border-outline-variant",
+                      parcela.pago && "opacity-60",
+                    )}
+                  >
+                    <td className="px-gutter-table">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "h-2 w-2 shrink-0 rounded-full",
+                            parcela.tipo === "RECEITA" ? "bg-receita" : "bg-despesa",
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-on-surface">
+                            {parcela.contrato_descricao}
+                          </p>
+                          <p className="truncate text-[11px] text-on-surface-variant">
+                            {parcela.categoria} · parcela {parcela.indice + 1}/
+                            {parcela.quantidade_planejada}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-gutter-table tabular text-on-surface-variant">
+                      {dataCurta(parcela.data_planejada)}
+                    </td>
+                    <td
+                      className={cn(
+                        "px-gutter-table text-right tabular",
+                        parcela.tipo === "RECEITA" ? "text-receita" : "text-despesa",
+                      )}
                     >
-                      <td className="px-gutter-table py-2">
-                        <div className="flex items-center gap-2 font-medium text-on-surface">
-                          <span
-                            className={cn(
-                              "h-2 w-2 shrink-0 rounded-full",
-                              receita ? "bg-receita" : "bg-despesa",
-                            )}
-                          />
-                          <span className="truncate">{r.descricao}</span>
-                        </div>
-                        {r.contrato_descricao && (
-                          <div className="ml-4 truncate text-[11px] text-on-surface-variant">
-                            Contrato: {r.contrato_descricao}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-gutter-table py-2 text-on-surface-variant">
-                        {r.categoria_nome}
-                      </td>
-                      <td className="whitespace-nowrap px-gutter-table py-2 tabular text-on-surface-variant">
-                        {formatarData(r.data_pagamento)}
-                      </td>
-                      <td className="px-gutter-table py-2 text-on-surface-variant">
-                        {r.forma_pagamento || "—"}
-                      </td>
-                      <td
-                        className={cn(
-                          "px-gutter-table py-2 text-right tabular",
-                          receita ? "text-receita" : "text-despesa",
-                        )}
-                      >
-                        {receita ? "+" : "−"} {formatarMoeda(r.valor)}
-                      </td>
-                      <td className="px-gutter-table py-2 text-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high hover:text-secondary"
-                            title="Editar"
-                            onClick={() => abrir(r)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="rounded p-1 text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
-                            title="Remover"
-                            onClick={() => setEmExclusao(r)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      {formatarMoeda(parcela.valor_previsto)}
+                    </td>
+                    <td className="px-gutter-table text-center">
+                      {parcela.pago ? (
+                        <Selo tom="sucesso">
+                          <Check className="h-3 w-3" />
+                          Baixada
+                        </Selo>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => setBaixando(parcela)}>
+                          Marcar como pago
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
+      </section>
 
-        {lista.length > 0 && (
-          <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low p-stack-sm text-body-sm text-on-surface-variant">
-            <span>
-              {lista.length} lançamento{lista.length === 1 ? "" : "s"}
-            </span>
+      <section className="cartao overflow-hidden">
+        <div className="border-b border-outline-variant bg-surface p-stack-md">
+          <h2 className="text-headline-sm text-on-surface">Lançado em {formatarCompetencia(mes)}</h2>
+        </div>
+        {(realizados.data ?? []).length === 0 ? (
+          <Card className="border-0 shadow-none">
+            <CardContent className="flex flex-col items-center gap-2 py-stack-lg text-center">
+              <CircleDollarSign className="h-8 w-8 text-on-surface-variant" />
+              <p className="text-body-sm text-on-surface-variant">
+                Nada lançado ainda neste mês.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="divide-y divide-outline-variant">
+            {(realizados.data ?? []).map((lancamento) => (
+              <div
+                key={lancamento.id}
+                className="flex items-center justify-between gap-stack-md p-stack-md"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-on-surface">{lancamento.descricao}</p>
+                  <p className="text-body-sm text-on-surface-variant">
+                    {lancamento.categoria_nome} · pago em {dataCurta(lancamento.data_pagamento)}
+                    {lancamento.origem !== "MANUAL" && ` · ${lancamento.origem.toLowerCase()}`}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 tabular font-semibold",
+                    lancamento.tipo === "RECEITA" ? "text-receita" : "text-despesa",
+                  )}
+                >
+                  {formatarMoeda(lancamento.valor)}
+                </span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
+      </section>
 
-      <FormularioRealizado
-        aberto={formularioAberto}
-        realizado={emEdicao}
-        onFechar={() => setFormularioAberto(false)}
-      />
-
-      <ModalConfirmacao
-        aberto={!!emExclusao}
-        titulo="Remover lançamento"
-        mensagem={`Deseja remover "${emExclusao?.descricao}"? Esta ação não pode ser desfeita.`}
-        rotuloBotao="Remover"
-        carregando={deletar.isPending}
-        onConfirmar={() => emExclusao && deletar.mutate(emExclusao.id)}
-        onFechar={() => setEmExclusao(null)}
-      />
+      <DialogoBaixa parcela={baixando} onFechar={() => setBaixando(null)} />
     </div>
+  );
+}
+
+/**
+ * Baixa da parcela.
+ *
+ * O valor vem preenchido com o previsto, mas é editável: a conta de luz quase
+ * nunca sai pelo valor projetado, e forçar o previsto criaria um realizado
+ * falso — justamente o dado que a previsão vai usar para aprender.
+ */
+function DialogoBaixa({
+  parcela,
+  onFechar,
+}: {
+  parcela: Parcela | null;
+  onFechar: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState("");
+
+  const aberto = Boolean(parcela);
+  const valorEfetivo = valor || parcela?.valor_previsto || "0";
+  const dataEfetiva = data || parcela?.data_planejada || "";
+  const diferenca = parcela
+    ? Number(valorEfetivo) - Number(parcela.valor_previsto)
+    : 0;
+
+  const baixar = useMutation({
+    mutationFn: () => api.baixarParcela(parcela!.id, valorEfetivo, dataEfetiva),
+    onSuccess: () => {
+      for (const chave of ["parcelas", "realizados", "fluxo-caixa", "confronto", "previsao"]) {
+        queryClient.invalidateQueries({ queryKey: [chave] });
+      }
+      toast({ title: "Lançamento registrado" });
+      setValor("");
+      setData("");
+      onFechar();
+    },
+    onError: (erro: ApiError) =>
+      toast({ variant: "destructive", title: "Não deu para registrar", description: erro.message }),
+  });
+
+  return (
+    <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Marcar como pago</DialogTitle>
+        </DialogHeader>
+
+        {parcela && (
+          <div className="space-y-stack-md">
+            <div className="rounded-lg border border-outline-variant bg-surface-container-low p-stack-sm">
+              <p className="font-medium text-on-surface">{parcela.contrato_descricao}</p>
+              <p className="text-body-sm text-on-surface-variant">
+                Previsto: {formatarMoeda(parcela.valor_previsto)} em{" "}
+                {dataCurta(parcela.data_planejada)}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-body-sm font-medium">Valor pago</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={valor}
+                placeholder={parcela.valor_previsto}
+                onChange={(e) => setValor(e.target.value)}
+              />
+              {Math.abs(diferenca) > 0.01 && (
+                <p className="text-[11px] text-on-surface-variant">
+                  {diferenca > 0 ? "Acima" : "Abaixo"} do previsto em{" "}
+                  {formatarMoeda(Math.abs(diferenca))}.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-body-sm font-medium">Data do pagamento</label>
+              <Input
+                type="date"
+                value={data}
+                placeholder={parcela.data_planejada}
+                onChange={(e) => setData(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-stack-sm">
+              <Button variant="ghost" onClick={onFechar}>
+                Cancelar
+              </Button>
+              <Button onClick={() => baixar.mutate()} disabled={baixar.isPending}>
+                <Wallet className="mr-2 h-4 w-4" />
+                {baixar.isPending ? "Registrando…" : "Registrar"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

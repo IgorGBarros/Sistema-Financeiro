@@ -156,7 +156,7 @@ def responder(
                     # sozinho — geralmente ele reformula e acerta na rodada
                     # seguinte.
                     dados, erro = {"erro": str(exc)}, True
-                except Exception as exc:  # noqa: BLE001
+                except Exception:  # noqa: BLE001
                     logger.exception("Falha na ferramenta %s", nome)
                     dados, erro = {"erro": "Falha ao consultar os dados."}, True
 

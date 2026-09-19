@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, ArrowDownToLine, ArrowUpFromLine, ListChecks, Plus,
-  SlidersHorizontal, TrendingUp, XCircle,
+  AlertCircle, ArrowDownToLine, ArrowUpFromLine, List, ListChecks, Plus,
+  Scale, SlidersHorizontal, Table2, TrendingUp, XCircle,
 } from "lucide-react";
 
 import { api, type Contrato, type TipoLancamento } from "@/shared/lib/api";
@@ -11,12 +11,15 @@ import { FormularioContrato } from "@/features/contratos/components/FormularioCo
 import { ModalRescindir } from "@/features/contratos/components/ModalRescindir";
 import { PainelProjecao } from "@/features/contratos/components/PainelProjecao";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
+import { Confronto } from "@/features/contratos/components/Confronto";
+import { MatrizContratos } from "@/features/contratos/components/MatrizContratos";
 import { Kpi } from "@/shared/components/Kpi";
 import { Selo } from "@/shared/components/Selo";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 
 type Filtro = "TODOS" | TipoLancamento;
+type Visao = "lista" | "matriz" | "confronto";
 
 const FREQUENCIAS: Record<string, string> = {
   M: "Mensal", B: "Bimestral", T: "Trimestral",
@@ -33,6 +36,7 @@ const vigencia = (inicio: string, fim: string) => {
 
 export default function Contratos() {
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
+  const [visao, setVisao] = useState<Visao>("lista");
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Contrato | null>(null);
   const [rescindirAberto, setRescindirAberto] = useState(false);
@@ -125,9 +129,44 @@ export default function Contratos() {
 
       <div className="grid grid-cols-1 gap-container-padding xl:grid-cols-3">
         <div className="cartao flex flex-col overflow-hidden xl:col-span-2">
-          <div className="flex items-center justify-between border-b border-outline-variant bg-surface p-stack-md">
-            <h2 className="text-headline-sm text-on-surface">Lista de contratos</h2>
-            <div className="flex gap-1 rounded-lg bg-surface-container-low p-1">
+          <div className="flex flex-wrap items-center justify-between gap-stack-sm border-b border-outline-variant bg-surface p-stack-md">
+            <div className="flex items-center gap-stack-md">
+              <h2 className="text-headline-sm text-on-surface">
+                {visao === "lista"
+                  ? "Lista de contratos"
+                  : visao === "matriz"
+                    ? "Previsto por mês"
+                    : "Previsto × realizado"}
+              </h2>
+              <div className="flex gap-1 rounded-lg bg-surface-container-low p-1">
+                {(["lista", "matriz", "confronto"] as const).map((valor) => (
+                  <button
+                    key={valor}
+                    onClick={() => setVisao(valor)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-3 py-1 text-body-sm transition-colors",
+                      visao === valor
+                        ? "bg-surface-container-lowest font-semibold text-on-surface shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface",
+                    )}
+                  >
+                    {valor === "lista" ? (
+                      <><List className="h-3.5 w-3.5" /> Lista</>
+                    ) : valor === "matriz" ? (
+                      <><Table2 className="h-3.5 w-3.5" /> Matriz</>
+                    ) : (
+                      <><Scale className="h-3.5 w-3.5" /> Confronto</>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div
+              className={cn(
+                "flex gap-1 rounded-lg bg-surface-container-low p-1",
+                visao !== "lista" && "hidden",
+              )}
+            >
               {(["TODOS", "RECEITA", "DESPESA"] as const).map((valor) => (
                 <button
                   key={valor}
@@ -145,7 +184,11 @@ export default function Contratos() {
             </div>
           </div>
 
-          {contratos.isLoading ? (
+          {visao === "confronto" ? (
+            <Confronto />
+          ) : visao === "matriz" ? (
+            <MatrizContratos />
+          ) : contratos.isLoading ? (
             <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
               Carregando…
             </p>
@@ -261,7 +304,7 @@ export default function Contratos() {
             </div>
           )}
 
-          {lista.length > 0 && (
+          {visao === "lista" && lista.length > 0 && (
             <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low p-stack-sm text-body-sm text-on-surface-variant">
               <span>
                 {lista.length} contrato{lista.length === 1 ? "" : "s"}

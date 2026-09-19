@@ -8,7 +8,6 @@ projeto modular volta a ser um monólito com passos extras.
 
 import uuid
 
-from django.conf import settings
 from django.db import models
 
 

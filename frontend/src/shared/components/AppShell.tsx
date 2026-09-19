@@ -1,28 +1,58 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
-  BookOpen,
-  CheckSquare,
+  Building2,
+  CheckCheck,
+  CreditCard,
   FileText,
+  FileUp,
+  FolderTree,
   LayoutDashboard,
+  Lightbulb,
   Menu,
   Receipt,
   Search,
   Sparkles,
+  TrendingUp,
   Wallet,
+  Wallet2,
   X,
 } from "lucide-react";
 
 import { BarraStatus } from "@/shared/components/BarraStatus";
 import { cn } from "@/shared/lib/utils";
 
+// Dois grupos: o que se usa todo dia e o que vem de documento importado.
+// Uma lista corrida de oito itens vira ruído — o agrupamento devolve a
+// hierarquia que a navegação perdeu ao crescer.
 const NAVEGACAO = [
-  { para: "/fluxo", rotulo: "Fluxo de caixa", icone: LayoutDashboard },
-  { para: "/contratos", rotulo: "Contratos", icone: FileText },
-  { para: "/realizados", rotulo: "Realizados", icone: CheckSquare },
-  { para: "/notas", rotulo: "Notas fiscais", icone: Receipt },
-  { para: "/catalogo", rotulo: "Catálogo", icone: BookOpen },
-  { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
+  {
+    grupo: null,
+    itens: [
+      { para: "/fluxo", rotulo: "Fluxo de caixa", icone: LayoutDashboard },
+      { para: "/previsao", rotulo: "Previsão", icone: TrendingUp },
+      { para: "/contratos", rotulo: "Contratos", icone: FileText },
+      { para: "/lancamentos", rotulo: "Lançamentos", icone: CheckCheck },
+      { para: "/cartoes", rotulo: "Cartões", icone: CreditCard },
+      { para: "/notas", rotulo: "Notas fiscais", icone: Receipt },
+    ],
+  },
+  {
+    grupo: "Documentos",
+    itens: [
+      { para: "/documentos", rotulo: "Importar PDF", icone: FileUp },
+      { para: "/financiamento", rotulo: "Financiamento", icone: Building2 },
+      { para: "/folha", rotulo: "Folha", icone: Wallet2 },
+      { para: "/contas", rotulo: "Contas de consumo", icone: Lightbulb },
+    ],
+  },
+  {
+    grupo: null,
+    itens: [
+      { para: "/plano-de-contas", rotulo: "Plano de contas", icone: FolderTree },
+      { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
+    ],
+  },
 ];
 
 /**
@@ -71,27 +101,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <ul className="flex flex-1 flex-col gap-unit">
-          {NAVEGACAO.map(({ para, rotulo, icone: Icone }) => (
-            <li key={para}>
-              <NavLink
-                to={para}
-                onClick={() => setMenuAberto(false)}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-stack-md rounded-lg px-stack-md py-stack-sm transition-colors",
-                    isActive
-                      ? "bg-secondary-container font-semibold text-on-secondary-container"
-                      : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
-                  )
-                }
-              >
-                <Icone className="h-5 w-5 shrink-0" />
-                <span className="text-body-md">{rotulo}</span>
-              </NavLink>
-            </li>
+        <nav className="flex flex-1 flex-col gap-stack-sm overflow-y-auto">
+          {NAVEGACAO.map((secao, indice) => (
+            <div key={secao.grupo ?? `secao-${indice}`}>
+              {secao.grupo && (
+                <p className="rotulo px-stack-md pb-1 pt-stack-sm">{secao.grupo}</p>
+              )}
+              <ul className="flex flex-col gap-unit">
+                {secao.itens.map(({ para, rotulo, icone: Icone }) => (
+                  <li key={para}>
+                    <NavLink
+                      to={para}
+                      onClick={() => setMenuAberto(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-stack-md rounded-lg px-stack-md py-stack-sm transition-colors",
+                          isActive
+                            ? "bg-secondary-container font-semibold text-on-secondary-container"
+                            : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+                        )
+                      }
+                    >
+                      <Icone className="h-5 w-5 shrink-0" />
+                      <span className="text-body-md">{rotulo}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </nav>
 
         <div className="mt-auto border-t border-outline-variant pt-stack-md">
           <div className="flex items-center gap-stack-sm rounded-lg px-stack-sm py-stack-sm">

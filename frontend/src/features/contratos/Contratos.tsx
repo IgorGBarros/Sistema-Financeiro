@@ -8,6 +8,7 @@ import {
 import { api, type Contrato, type TipoLancamento } from "@/shared/lib/api";
 import { formatarMoeda } from "@/features/fiscal/nfce";
 import { FormularioContrato } from "@/features/contratos/components/FormularioContrato";
+import { ModalRescindir } from "@/features/contratos/components/ModalRescindir";
 import { PainelProjecao } from "@/features/contratos/components/PainelProjecao";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Kpi } from "@/shared/components/Kpi";
@@ -34,6 +35,8 @@ export default function Contratos() {
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Contrato | null>(null);
+  const [rescindirAberto, setRescindirAberto] = useState(false);
+  const [emRescisao, setEmRescisao] = useState<Contrato | null>(null);
 
   const contratos = useQuery({
     queryKey: ["contratos", filtro],
@@ -63,6 +66,11 @@ export default function Contratos() {
   function abrir(contrato: Contrato | null) {
     setEmEdicao(contrato);
     setFormularioAberto(true);
+  }
+
+  function abrirRescindir(contrato: Contrato) {
+    setEmRescisao(contrato);
+    setRescindirAberto(true);
   }
 
   return (
@@ -231,16 +239,18 @@ export default function Contratos() {
                             >
                               <ListChecks className="h-4 w-4" />
                             </button>
-                            <button
-                              className="rounded p-1 text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
-                              title="Rescindir"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                abrir(contrato);
-                              }}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
+                            {contrato.status === "ATIVO" && (
+                              <button
+                                className="rounded p-1 text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
+                                title="Rescindir"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirRescindir(contrato);
+                                }}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -267,6 +277,12 @@ export default function Contratos() {
         aberto={formularioAberto}
         contrato={emEdicao}
         onFechar={() => setFormularioAberto(false)}
+      />
+
+      <ModalRescindir
+        aberto={rescindirAberto}
+        contrato={emRescisao}
+        onFechar={() => { setRescindirAberto(false); setEmRescisao(null); }}
       />
     </div>
   );

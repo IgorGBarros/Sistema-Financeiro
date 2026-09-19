@@ -33,6 +33,24 @@ export interface Estabelecimento {
   cnpj: string;
 }
 
+export interface Realizado {
+  id: string;
+  contrato: string | null;
+  contrato_descricao: string | null;
+  parcela: string | null;
+  categoria: string;
+  categoria_nome: string;
+  descricao: string;
+  tipo: TipoLancamento;
+  competencia: string;
+  data_pagamento: string;
+  valor: string;
+  forma_pagamento: string;
+  origem: "MANUAL" | "BAIXA" | "MERCADO";
+  competencia_mercado: string | null;
+  observacao: string;
+}
+
 export interface Contrato {
   id: string;
   numero: number | null;
@@ -240,10 +258,32 @@ const qs = (params: Record<string, string | undefined>) =>
 
 export const api = {
   classificacoes: () => lista<Classificacao>("/classificacoes/"),
+  salvarClassificacao: (dados: Partial<Classificacao>, id?: string) =>
+    request<Classificacao>(id ? `/classificacoes/${id}/` : "/classificacoes/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarClassificacao: (id: string) =>
+    request<void>(`/classificacoes/${id}/`, { method: "DELETE" }),
+
   categorias: (tipo?: TipoLancamento) =>
     lista<Categoria>(`/categorias/?${qs({ tipo })}`),
+  salvarCategoria: (dados: Partial<Categoria>, id?: string) =>
+    request<Categoria>(id ? `/categorias/${id}/` : "/categorias/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarCategoria: (id: string) =>
+    request<void>(`/categorias/${id}/`, { method: "DELETE" }),
 
   estabelecimentos: () => lista<Estabelecimento>("/estabelecimentos/"),
+  salvarEstabelecimento: (dados: Partial<Estabelecimento>, id?: string) =>
+    request<Estabelecimento>(id ? `/estabelecimentos/${id}/` : "/estabelecimentos/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarEstabelecimento: (id: string) =>
+    request<void>(`/estabelecimentos/${id}/`, { method: "DELETE" }),
 
   /** Parcelas de todos os contratos no período — alimenta a linha do tempo. */
   parcelas: (filtros: Record<string, string | undefined> = {}) =>
@@ -316,6 +356,16 @@ export const api = {
     request<CapacidadesAssistente>("/assistente/capacidades/"),
   conversas: () =>
     lista<{ id: string; titulo: string; atualizado_em: string }>("/assistente/"),
+
+  realizados: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Realizado>(`/realizados/?${qs(filtros)}`),
+  salvarRealizado: (dados: Partial<Realizado>, id?: string) =>
+    request<Realizado>(id ? `/realizados/${id}/` : "/realizados/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarRealizado: (id: string) =>
+    request<void>(`/realizados/${id}/`, { method: "DELETE" }),
 
   baixarParcela: (parcela: string, valor: string, data_pagamento: string) =>
     request(`/realizados/baixar-parcela/`, {

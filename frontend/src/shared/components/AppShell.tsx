@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
+  BookOpen,
+  CheckSquare,
   FileText,
   LayoutDashboard,
   Menu,
@@ -17,7 +19,9 @@ import { cn } from "@/shared/lib/utils";
 const NAVEGACAO = [
   { para: "/fluxo", rotulo: "Fluxo de caixa", icone: LayoutDashboard },
   { para: "/contratos", rotulo: "Contratos", icone: FileText },
+  { para: "/realizados", rotulo: "Realizados", icone: CheckSquare },
   { para: "/notas", rotulo: "Notas fiscais", icone: Receipt },
+  { para: "/catalogo", rotulo: "Catálogo", icone: BookOpen },
   { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
 ];
 

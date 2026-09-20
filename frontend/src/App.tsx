@@ -18,6 +18,7 @@ import Notas from "@/features/fiscal/Notas";
 import Previsao from "@/features/previsao/Previsao";
 import FluxoCaixa from "@/features/fluxo/FluxoCaixa";
 import Folha from "@/features/folha/Folha";
+import IR from "@/features/ir/IR";
 import { AppShell } from "@/shared/components/AppShell";
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/evolucao-categoria" element={<EvolucaoCategoria />} />
         <Route path="/contratos/:id" element={<DetalheContrato />} />
         <Route path="/assistente" element={<Assistente />} />
+        <Route path="/ir" element={<IR />} />
         <Route
           path="*"
           element={

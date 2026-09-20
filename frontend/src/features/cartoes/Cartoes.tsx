@@ -36,6 +36,11 @@ export default function Cartoes() {
     queryFn: () => api.painelCartoes(iso(inicio), iso(fim)),
   });
 
+  const cartoes = useQuery({
+    queryKey: ["cartoes"],
+    queryFn: () => api.cartoes(),
+  });
+
   const dados = painel.data;
 
   const linhas = useMemo(
@@ -191,6 +196,11 @@ export default function Cartoes() {
               { chave: "uso", rotulo: "Uso" },
             ]}
             vazio="Nenhum cartão cadastrado. Sem ao menos um, a importação de fatura não consegue identificar de qual cartão ela é."
+            aoClicarLinha={(id) => {
+              const cartao = (cartoes.data ?? []).find((c) => c.id === id) ?? null;
+              setEmEdicao(cartao);
+              setFormularioAberto(true);
+            }}
           />
         )}
       </div>

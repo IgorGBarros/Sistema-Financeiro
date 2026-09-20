@@ -949,6 +949,7 @@ export const api = {
       method: id ? "PATCH" : "POST",
       body: JSON.stringify(dados),
     }),
+  deletarCartao: (id: string) => request<void>(`/cartoes/${id}/`, { method: "DELETE" }),
 
   faturas: (filtros: Record<string, string | undefined> = {}) =>
     lista<Fatura>(`/faturas/?${qs(filtros)}`),

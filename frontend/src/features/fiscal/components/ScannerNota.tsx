@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Camera, Keyboard, Loader2, RotateCcw } from "lucide-react";
+import { Camera, Keyboard, Loader2, RotateCcw, VideoOff } from "lucide-react";
 
 import { api, ApiError, type NotaFiscal } from "@/shared/lib/api";
 import { extrairChave, validarChaveAcesso } from "@/features/fiscal/nfce";
@@ -15,6 +15,9 @@ import { useToast } from "@/shared/ui/use-toast";
 const ID_LEITOR = "leitor-qrcode";
 
 type Modo = "camera" | "digitar";
+// Estado da câmera separado de `modo` para exibir o spinner enquanto o
+// navegador mostra o diálogo de permissão.
+type EstadoCamera = "solicitando" | "ativa" | "negada" | "erro";
 
 interface Props {
   aberto: boolean;
@@ -34,6 +37,7 @@ interface Props {
  */
 export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   const [modo, setModo] = useState<Modo>("camera");
+  const [estadoCamera, setEstadoCamera] = useState<EstadoCamera>("solicitando");
   const [chaveDigitada, setChaveDigitada] = useState("");
   const [erroCamera, setErroCamera] = useState<string | null>(null);
   // Incrementado em "Tentar de novo" para forçar o useEffect a re-executar
@@ -46,10 +50,11 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   const refContainer = useCallback((node: HTMLDivElement | null) => {
     setDivPronta(node !== null);
   }, []);
+
   const online = useConexao();
   const leitorRef = useRef<Html5Qrcode | null>(null);
   const processandoRef = useRef(false);
-  // Evita que o .catch() de uma tentativa anterior (promise em voo) afete
+  // Evita que callbacks de tentativas anteriores (promise em voo) afetem
   // uma instância já fechada ou reaberta do scanner.
   const ativoRef = useRef(false);
   const queryClient = useQueryClient();
@@ -93,8 +98,6 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
       }
 
       // Só agora libera o guard — depois de descartar o caminho offline.
-      // Liberar antes criaria uma janela onde a câmera ainda ativa poderia
-      // disparar um segundo scan enquanto o erro ainda está sendo tratado.
       processandoRef.current = false;
 
       toast({
@@ -122,9 +125,8 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   function fechar() {
     ativoRef.current = false;
     void pararCamera();
-    // Resetar modo garante que na próxima abertura (via prop aberto ou remount)
-    // o componente sempre inicie pelo caminho da câmera.
     setModo("camera");
+    setEstadoCamera("solicitando");
     setChaveDigitada("");
     setErroCamera(null);
     setDivPronta(false);
@@ -140,57 +142,82 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
 
     ativoRef.current = true;
     processandoRef.current = false;
+    setEstadoCamera("solicitando");
 
-    // O construtor de Html5Qrcode chama document.getElementById(ID_LEITOR)
-    // de forma síncrona. Se o elemento não estiver no DOM neste momento
-    // (ex.: race condition com o portal do Dialog), capturamos o erro aqui
-    // em vez de deixar o effect crashar silenciosamente.
-    let leitor: Html5Qrcode;
-    try {
-      leitor = new Html5Qrcode(ID_LEITOR, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false,
-      });
-    } catch {
-      setErroCamera("Não foi possível inicializar o leitor de câmera neste aparelho. Digite a chave abaixo.");
-      setModo("digitar");
-      return;
-    }
-    leitorRef.current = leitor;
+    // Solicitar permissão explicitamente antes de criar o Html5Qrcode.
+    // getUserMedia exibe o diálogo "Permitir câmera?" do navegador e permite
+    // que a UI mostre o spinner enquanto o usuário decide. O stream é liberado
+    // imediatamente — o Html5Qrcode cria o próprio stream ao chamar .start().
+    // Isso também garante que o elemento #leitor-qrcode já existe no DOM
+    // (divPronta=true) antes de qualquer chamada a getElementById.
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        stream.getTracks().forEach((t) => t.stop());
 
-    leitor
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
-        (texto) => {
-          // O leitor dispara várias vezes com o mesmo código.
-          if (processandoRef.current) return;
-          processandoRef.current = true;
-          void pararCamera();
-          cadastrar.mutate(texto);
-        },
-        () => {
-          // silencia os "não encontrei QR neste frame"
-        },
-      )
-      .catch((erro: Error) => {
-        // Ignora rejeições de instâncias antigas (dialog fechado/reaberto
-        // antes de .start() resolver) para não poluir uma sessão nova.
         if (!ativoRef.current) return;
-        setErroCamera(
-          erro.name === "NotAllowedError"
-            ? "Permita o acesso à câmera nas configurações do navegador para ler o cupom."
-            : "Não foi possível abrir a câmera neste aparelho. Digite a chave abaixo.",
-        );
-        setModo("digitar");
+
+        let leitor: Html5Qrcode;
+        try {
+          leitor = new Html5Qrcode(ID_LEITOR, {
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+            verbose: false,
+          });
+        } catch {
+          if (!ativoRef.current) return;
+          setErroCamera("Não foi possível inicializar o leitor. Digite a chave abaixo.");
+          setEstadoCamera("erro");
+          setModo("digitar");
+          return;
+        }
+        leitorRef.current = leitor;
+        setEstadoCamera("ativa");
+
+        leitor
+          .start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
+            (texto) => {
+              if (processandoRef.current) return;
+              processandoRef.current = true;
+              void pararCamera();
+              cadastrar.mutate(texto);
+            },
+            () => {
+              // silencia os "não encontrei QR neste frame"
+            },
+          )
+          .catch((erro: Error) => {
+            if (!ativoRef.current) return;
+            setErroCamera(
+              "Não foi possível abrir a câmera neste aparelho. Digite a chave abaixo.",
+            );
+            setEstadoCamera("erro");
+            setModo("digitar");
+          });
+      })
+      .catch((erro: Error) => {
+        if (!ativoRef.current) return;
+        if (erro.name === "NotAllowedError" || erro.name === "PermissionDeniedError") {
+          // Permissão negada: não muda para "digitar" automaticamente — o usuário
+          // pode desbloquear nas configurações do navegador e tentar de novo.
+          setEstadoCamera("negada");
+        } else if (erro.name === "NotFoundError") {
+          setErroCamera("Nenhuma câmera encontrada neste aparelho. Digite a chave abaixo.");
+          setEstadoCamera("erro");
+          setModo("digitar");
+        } else {
+          setErroCamera("Não foi possível abrir a câmera. Digite a chave abaixo.");
+          setEstadoCamera("erro");
+          setModo("digitar");
+        }
       });
 
     return () => {
       ativoRef.current = false;
       void pararCamera();
     };
-    // `tentativa` entra nas deps para que "Tentar de novo" force o effect a
-    // re-executar mesmo quando `modo` já é "camera" (nenhum estado muda).
+    // `tentativa` força re-execução quando modo já é "camera".
     // `divPronta` garante que o portal do Dialog já inseriu o elemento no DOM.
   }, [aberto, modo, tentativa, divPronta]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -213,20 +240,61 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           </div>
         ) : modo === "camera" ? (
           <div className="space-y-3">
+            {/* O div do leitor fica sempre no DOM enquanto modo === "camera".
+                refContainer notifica o effect quando o portal já inseriu o
+                elemento, evitando o race condition com getElementById. */}
             <div
               id={ID_LEITOR}
               ref={refContainer}
-              className="overflow-hidden rounded-lg border bg-muted aspect-square"
-            />
+              className="relative overflow-hidden rounded-lg border bg-muted aspect-square"
+            >
+              {estadoCamera === "solicitando" && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Aguardando permissão da câmera…
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Se o navegador perguntar, clique em <strong>Permitir</strong>.
+                  </p>
+                </div>
+              )}
+              {estadoCamera === "negada" && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                  <VideoOff className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">Câmera bloqueada</p>
+                  <p className="text-xs text-muted-foreground">
+                    Clique no ícone de câmera na barra de endereço e escolha{" "}
+                    <strong>Permitir</strong>, depois tente novamente.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <p className="text-sm text-muted-foreground">
               {online
                 ? "Aponte para o QR Code impresso no rodapé do cupom."
                 : "Sem conexão: os cupons ficam guardados e são enviados quando a internet voltar."}
             </p>
-            <Button variant="ghost" className="w-full" onClick={() => setModo("digitar")}>
-              <Keyboard className="mr-2 h-4 w-4" />
-              Digitar a chave
-            </Button>
+
+            {estadoCamera === "negada" ? (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  cadastrar.reset();
+                  setEstadoCamera("solicitando");
+                  setTentativa((n) => n + 1);
+                }}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Tentar novamente
+              </Button>
+            ) : (
+              <Button variant="ghost" className="w-full" onClick={() => setModo("digitar")}>
+                <Keyboard className="mr-2 h-4 w-4" />
+                Digitar a chave
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -267,6 +335,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
                 onClick={() => {
                   setErroCamera(null);
                   cadastrar.reset();
+                  setEstadoCamera("solicitando");
                   setModo("camera");
                 }}
               >
@@ -282,8 +351,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
             className="w-full"
             onClick={() => {
               cadastrar.reset();
-              // Se o modo já for "camera", apenas incrementar `tentativa`
-              // força o useEffect a re-executar e reiniciar a câmera.
+              setEstadoCamera("solicitando");
               setModo("camera");
               setTentativa((n) => n + 1);
             }}

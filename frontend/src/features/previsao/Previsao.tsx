@@ -92,9 +92,9 @@ export default function Previsao() {
       />
 
       {dados?.aviso && (
-        <Card className="mb-container-padding border-amber-500/60">
+        <Card className="mb-container-padding border-warning/60">
           <CardContent className="flex items-start gap-3 pt-6">
-            <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="text-body-sm">
               <p className="font-medium">Projeção sem faixa de incerteza</p>
               <p className="text-on-surface-variant">{dados.aviso}</p>
@@ -282,7 +282,7 @@ export default function Previsao() {
                       key={mes.competencia}
                       className={cn(
                         "h-[36px] border-b border-outline-variant",
-                        perigo && "bg-amber-50/60 dark:bg-amber-950/20",
+                        perigo && "bg-warning-container/30",
                       )}
                     >
                       <td className="px-gutter-table">{formatarCompetencia(mes.competencia)}</td>

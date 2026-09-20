@@ -49,22 +49,22 @@ export function AlertaTurnaround() {
   }).format(new Date(`${pior.competencia}T12:00:00`));
 
   return (
-    <div className="flex items-start gap-3 border-b border-red-500/30 bg-red-50 px-container-padding py-2.5 dark:bg-red-950/20">
-      <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-      <p className="flex-1 text-body-sm text-red-800 dark:text-red-200">
+    <div className="flex items-start gap-3 border-b border-error/30 bg-error-container px-container-padding py-2.5">
+      <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-error" />
+      <p className="flex-1 text-body-sm text-on-error-container">
         <span className="font-semibold">Projeção negativa:</span> o saldo chega a{" "}
         <span className="font-semibold tabular">{formatarMoeda(pior.saldo_acumulado)}</span>{" "}
         em {nomeMes}.{" "}
         <Link
           to="/turnaround"
-          className="font-semibold underline hover:text-red-900 dark:hover:text-red-100"
+          className="font-semibold underline hover:opacity-80"
         >
           Iniciar recuperação →
         </Link>
       </p>
       <button
         onClick={() => setDispensado(true)}
-        className="shrink-0 text-red-600 hover:text-red-800 dark:text-red-400"
+        className="shrink-0 text-error hover:opacity-80"
         aria-label="Dispensar alerta"
       >
         <X className="h-4 w-4" />

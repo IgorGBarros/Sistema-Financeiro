@@ -53,6 +53,14 @@ export default {
           DEFAULT: "var(--on-error)",
           container: "var(--on-error-container)",
         },
+        warning: {
+          DEFAULT: "var(--warning)",
+          container: "var(--warning-container)",
+        },
+        "on-warning": {
+          DEFAULT: "var(--on-warning)",
+          container: "var(--on-warning-container)",
+        },
         // Receita e despesa são conceito de domínio, não decoração: ficam
         // nomeados para que gráfico, tabela e badge nunca discordem.
         receita: {

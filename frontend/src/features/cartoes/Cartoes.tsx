@@ -136,9 +136,9 @@ export default function Cartoes() {
       </div>
 
       {apertados.length > 0 && (
-        <Card className="mb-container-padding border-amber-500/60">
+        <Card className="mb-container-padding border-warning/60">
           <CardContent className="flex items-start gap-3 pt-6">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="text-body-sm">
               <p className="font-medium">
                 {apertados.length === 1 ? "Um cartão está" : `${apertados.length} cartões estão`}{" "}

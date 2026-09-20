@@ -327,8 +327,8 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
             {/* Mira */}
             {(estadoCamera === "iniciando" || estadoCamera === "ativa") && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="relative aspect-square w-[65%] rounded-xl border-2 border-red-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
-                  <div className="absolute top-1/2 h-0.5 w-full -translate-y-1/2 animate-pulse bg-red-500 shadow-[0_0_8px_red]" />
+                <div className="relative aspect-square w-[65%] rounded-xl border-2 border-receita shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
+                  <div className="absolute top-1/2 h-0.5 w-full -translate-y-1/2 animate-pulse bg-receita shadow-[0_0_8px_var(--receita)]" />
                   <div className="absolute left-0 top-0 h-5 w-5 rounded-tl-sm border-l-2 border-t-2 border-white" />
                   <div className="absolute right-0 top-0 h-5 w-5 rounded-tr-sm border-r-2 border-t-2 border-white" />
                   <div className="absolute bottom-0 left-0 h-5 w-5 rounded-bl-sm border-b-2 border-l-2 border-white" />
@@ -384,13 +384,13 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
             )}
 
             {erroCamera && estadoCamera !== "negada" && (
-              <div className="pointer-events-none absolute inset-x-4 bottom-20 rounded-lg bg-red-700/90 px-4 py-3 text-center text-sm font-medium backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-x-4 bottom-20 rounded-lg bg-error/90 px-4 py-3 text-center text-sm font-medium text-on-error backdrop-blur-sm">
                 {erroCamera}
               </div>
             )}
 
             {!online && (
-              <div className="pointer-events-none absolute inset-x-4 top-14 rounded-lg bg-amber-700/80 px-4 py-2 text-center text-xs backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-x-4 top-14 rounded-lg bg-warning-container/90 px-4 py-2 text-center text-xs text-on-warning-container backdrop-blur-sm">
                 Sem conexão — o cupom será guardado e enviado quando a internet voltar.
               </div>
             )}
@@ -399,7 +399,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           /* Modo digitar */
           <div className="flex flex-1 flex-col gap-4 bg-zinc-950 p-5">
             {erroCamera && (
-              <p className="rounded-lg bg-red-700/30 p-3 text-sm text-red-300">
+              <p className="rounded-lg bg-error-container/40 p-3 text-sm text-on-error-container">
                 {erroCamera}
               </p>
             )}

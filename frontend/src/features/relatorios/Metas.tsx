@@ -151,7 +151,7 @@ export default function Metas() {
                   <div
                     className={cn(
                       "h-full rounded-full transition-all",
-                      excedeu ? "bg-despesa" : pct >= 80 ? "bg-amber-500" : "bg-receita",
+                      excedeu ? "bg-despesa" : pct >= 80 ? "bg-warning" : "bg-receita",
                     )}
                     style={{ width: `${pct}%` }}
                   />
@@ -163,7 +163,7 @@ export default function Metas() {
                   </span>
                   <span className={cn(
                     "font-semibold",
-                    excedeu ? "text-despesa" : pct >= 80 ? "text-amber-600" : "text-on-surface-variant",
+                    excedeu ? "text-despesa" : pct >= 80 ? "text-warning" : "text-on-surface-variant",
                   )}>
                     {Math.round(pct)}%
                     {excedeu && ` (+${formatarMoeda(gasto - tetoNum)})`}

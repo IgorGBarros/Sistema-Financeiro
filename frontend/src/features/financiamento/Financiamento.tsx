@@ -203,9 +203,9 @@ function Detalhe({ financiamento }: { financiamento: TipoFinanciamento }) {
       </div>
 
       {(duplicidades.data?.duplicidades ?? []).length > 0 && (
-        <Card className="mb-container-padding border-amber-500/60">
+        <Card className="mb-container-padding border-warning/60">
           <CardContent className="flex items-start gap-3 pt-6">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="text-body-sm">
               <p className="font-medium">
                 {duplicidades.data!.duplicidades.length} parcela(s) com possível duplicidade

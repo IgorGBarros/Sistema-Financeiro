@@ -52,9 +52,9 @@ export default function Documentos() {
 
         <div className="lg:col-span-2">
           {(comErro.length > 0 || comAviso.length > 0) && (
-            <Card className="mb-container-padding border-amber-500/60">
+            <Card className="mb-container-padding border-warning/60">
               <CardContent className="flex items-start gap-3 pt-6">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
                 <div className="text-body-sm">
                   <p className="font-medium">
                     {comErro.length > 0 && `${comErro.length} documento(s) com erro`}
@@ -240,7 +240,7 @@ function LinhaDocumento({ documento }: { documento: DocumentoImportado }) {
             <p className="mt-1 text-[11px] text-error">{documento.erro}</p>
           )}
           {documento.avisos?.map((aviso) => (
-            <p key={aviso} className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+            <p key={aviso} className="mt-1 text-[11px] text-warning">
               {aviso}
             </p>
           ))}

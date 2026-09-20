@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle, CheckCircle2, FileText, FileUp, Loader2, RefreshCw,
+  AlertTriangle, CheckCircle2, ChevronDown, FileText, FileUp, Loader2, RefreshCw,
 } from "lucide-react";
 
 import { api, ApiError, type DocumentoImportado } from "@/shared/lib/api";
@@ -183,6 +183,13 @@ function Envio({ tipos }: { tipos: { tipo: string; nome: string }[] }) {
 function LinhaDocumento({ documento }: { documento: DocumentoImportado }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [expandido, setExpandido] = useState(false);
+
+  const detalhe = useQuery({
+    queryKey: ["documentos", documento.id],
+    queryFn: () => api.documento(documento.id),
+    enabled: expandido,
+  });
 
   const reprocessar = useMutation({
     mutationFn: () => api.reprocessarDocumento(documento.id),
@@ -194,59 +201,103 @@ function LinhaDocumento({ documento }: { documento: DocumentoImportado }) {
       toast({ variant: "destructive", title: "Falhou", description: erro.message }),
   });
 
+  const linhas = detalhe.data?.linhas ?? [];
+
   return (
-    <div className="flex items-start justify-between gap-stack-md p-stack-md">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-medium text-on-surface">
-            {ROTULOS[documento.tipo] ?? documento.tipo}
+    <div>
+      <div className="flex items-start justify-between gap-stack-md p-stack-md">
+        <button
+          onClick={() => setExpandido((v) => !v)}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate font-medium text-on-surface">
+              {ROTULOS[documento.tipo] ?? documento.tipo}
+            </p>
+            {documento.competencia && <Selo>{formatarCompetencia(documento.competencia)}</Selo>}
+            {documento.status === "ERRO" ? (
+              <Selo tom="erro">
+                <AlertTriangle className="h-3 w-3" />
+                erro
+              </Selo>
+            ) : documento.avisos?.length ? (
+              <Selo tom="aviso">
+                <AlertTriangle className="h-3 w-3" />
+                ressalva
+              </Selo>
+            ) : (
+              <Selo tom="sucesso">
+                <CheckCircle2 className="h-3 w-3" />
+                ok
+              </Selo>
+            )}
+          </div>
+          <p className="truncate text-body-sm text-on-surface-variant">
+            {documento.nome_arquivo}
+            {documento.emitente && ` · ${documento.emitente}`}
           </p>
-          {documento.competencia && <Selo>{formatarCompetencia(documento.competencia)}</Selo>}
-          {documento.status === "ERRO" ? (
-            <Selo tom="erro">
-              <AlertTriangle className="h-3 w-3" />
-              erro
-            </Selo>
-          ) : documento.avisos?.length ? (
-            <Selo tom="aviso">
-              <AlertTriangle className="h-3 w-3" />
-              ressalva
-            </Selo>
-          ) : (
-            <Selo tom="sucesso">
-              <CheckCircle2 className="h-3 w-3" />
-              ok
-            </Selo>
+          {documento.erro && (
+            <p className="mt-1 text-[11px] text-error">{documento.erro}</p>
           )}
+          {documento.avisos?.map((aviso) => (
+            <p key={aviso} className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+              {aviso}
+            </p>
+          ))}
+        </button>
+
+        <div className="flex shrink-0 items-center gap-stack-sm">
+          {documento.valor_total && (
+            <span className="tabular font-medium">{formatarMoeda(documento.valor_total)}</span>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            title="Reinterpretar com a versão atual do leitor"
+            onClick={() => reprocessar.mutate()}
+            disabled={reprocessar.isPending}
+          >
+            <RefreshCw className={cn("h-4 w-4", reprocessar.isPending && "animate-spin")} />
+          </Button>
+          <button
+            onClick={() => setExpandido((v) => !v)}
+            className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high"
+            title={expandido ? "Recolher itens" : "Ver itens extraídos"}
+          >
+            <ChevronDown className={cn("h-4 w-4 transition-transform", expandido && "rotate-180")} />
+          </button>
         </div>
-        <p className="truncate text-body-sm text-on-surface-variant">
-          {documento.nome_arquivo}
-          {documento.emitente && ` · ${documento.emitente}`}
-        </p>
-        {documento.erro && (
-          <p className="mt-1 text-[11px] text-error">{documento.erro}</p>
-        )}
-        {documento.avisos?.map((aviso) => (
-          <p key={aviso} className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-            {aviso}
-          </p>
-        ))}
       </div>
 
-      <div className="flex shrink-0 items-center gap-stack-sm">
-        {documento.valor_total && (
-          <span className="tabular font-medium">{formatarMoeda(documento.valor_total)}</span>
-        )}
-        <Button
-          size="sm"
-          variant="ghost"
-          title="Reinterpretar com a versão atual do leitor"
-          onClick={() => reprocessar.mutate()}
-          disabled={reprocessar.isPending}
-        >
-          <RefreshCw className={cn("h-4 w-4", reprocessar.isPending && "animate-spin")} />
-        </Button>
-      </div>
+      {expandido && (
+        <div className="border-t border-outline-variant bg-surface-container-lowest px-stack-md pb-stack-md">
+          {detalhe.isLoading ? (
+            <p className="pt-stack-sm text-body-sm text-on-surface-variant">Carregando itens…</p>
+          ) : linhas.length === 0 ? (
+            <p className="pt-stack-sm text-body-sm text-on-surface-variant">
+              Nenhum item extraído.
+            </p>
+          ) : (
+            <div className="mt-stack-sm divide-y divide-outline-variant rounded-md border border-outline-variant">
+              {linhas.map((linha) => (
+                <div key={linha.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-body-sm">
+                  <span className="truncate text-on-surface">{linha.descricao}</span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {linha.data && (
+                      <span className="text-on-surface-variant">
+                        {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(
+                          new Date(`${linha.data}T12:00:00`),
+                        )}
+                      </span>
+                    )}
+                    <span className="tabular font-medium">{formatarMoeda(linha.valor)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

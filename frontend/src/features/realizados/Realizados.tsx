@@ -51,8 +51,12 @@ export default function Realizados() {
   });
 
   const realizados = useQuery({
-    queryKey: ["realizados", mes],
-    queryFn: () => api.realizados({ competencia: mes }),
+    queryKey: ["realizados", mes, filtroTipo],
+    queryFn: () =>
+      api.realizados({
+        competencia: mes,
+        ...(filtroTipo !== "TODOS" ? { tipo: filtroTipo } : {}),
+      }),
   });
 
   const { pendentes, pagas } = useMemo(() => {
@@ -77,12 +81,11 @@ export default function Realizados() {
 
   const realizadosFiltrados = useMemo(() => {
     return (realizados.data ?? []).filter((r) => {
-      if (filtroTipo !== "TODOS" && r.tipo !== filtroTipo) return false;
       if (filtroClassificacao !== "TODAS" && r.classificacao_nome !== filtroClassificacao) return false;
       if (filtroOrigem !== "TODAS" && r.origem !== filtroOrigem) return false;
       return true;
     });
-  }, [realizados.data, filtroTipo, filtroClassificacao, filtroOrigem]);
+  }, [realizados.data, filtroClassificacao, filtroOrigem]);
 
   const totalPago = realizadosFiltrados.reduce((t, r) => t + Number(r.valor), 0);
 

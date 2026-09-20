@@ -2,13 +2,14 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle, CheckCircle2, Clock, QrCode, RefreshCw, ScanLine, Upload,
+  AlertTriangle, CheckCircle2, Clock, QrCode, RefreshCw, ScanLine, Search, Upload,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 
 import { api, type NotaFiscal } from "@/shared/lib/api";
+import { Input } from "@/shared/ui/input";
 import { formatarCnpj, formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { listarPendentes } from "@/features/fiscal/fila";
 import { usePendentes, useSincronizacaoCupons } from "@/features/fiscal/hooks/useSincronizacao";
@@ -47,6 +48,8 @@ export default function Notas() {
   const [scannerAberto, setScannerAberto] = useState(false);
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<NotaFiscal | null>(null);
+  const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<"" | "IMPORTADA" | "ERRO">("");
   const [parametros, setParametros] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -63,7 +66,14 @@ export default function Notas() {
     }
   }, [parametros, setParametros]);
 
-  const notas = useQuery({ queryKey: ["notas"], queryFn: () => api.notas() });
+  const notas = useQuery({
+    queryKey: ["notas", busca, filtroStatus],
+    queryFn: () =>
+      api.notas({
+        ...(busca ? { search: busca } : {}),
+        ...(filtroStatus ? { status: filtroStatus } : {}),
+      }),
+  });
   // `pendentes` já é o contador da fila offline; este é outro conceito:
   // cupom lido cuja forma de pagamento ninguém informou.
   const semPagamento = useQuery({
@@ -223,8 +233,28 @@ export default function Notas() {
           </div>
 
           <div className="cartao overflow-hidden">
-            <div className="flex items-center justify-between border-b border-outline-variant bg-surface p-stack-md">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-surface p-stack-md">
               <h2 className="text-headline-sm text-on-surface">Leituras recentes</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-on-surface-variant" />
+                  <Input
+                    className="pl-8 h-8 w-44 text-body-sm"
+                    placeholder="Buscar emitente"
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                  />
+                </div>
+                <select
+                  className="h-8 rounded-md border border-input bg-background px-2.5 text-body-sm"
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value as "" | "IMPORTADA" | "ERRO")}
+                >
+                  <option value="">Todos os status</option>
+                  <option value="IMPORTADA">Sincronizado</option>
+                  <option value="ERRO">Com erro</option>
+                </select>
+              </div>
             </div>
 
             {notas.isLoading ? (

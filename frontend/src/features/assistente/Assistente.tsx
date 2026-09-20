@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Send, Wrench } from "lucide-react";
+import { AlertCircle, MessageSquarePlus, Send, Trash2, Wrench } from "lucide-react";
 
 import { api, ApiError } from "@/shared/lib/api";
+import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
@@ -30,6 +31,22 @@ export default function Assistente() {
   const capacidades = useQuery({
     queryKey: ["assistente", "capacidades"],
     queryFn: () => api.capacidadesAssistente(),
+  });
+
+  const historicoConversas = useQuery({
+    queryKey: ["assistente", "conversas"],
+    queryFn: () => api.conversas(),
+  });
+
+  const deletarConversa = useMutation({
+    mutationFn: (id: string) => api.deletarConversa(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["assistente", "conversas"] });
+      if (conversa === id) {
+        setConversa(null);
+        setFalas([]);
+      }
+    },
   });
 
   useEffect(() => {
@@ -61,11 +78,52 @@ export default function Assistente() {
     perguntar.mutate(limpo);
   }
 
+  function novaConversa() {
+    setConversa(null);
+    setFalas([]);
+  }
+
   const erro = perguntar.error as ApiError | null;
   const naoConfigurado = erro?.status === 503;
+  const conversas = historicoConversas.data ?? [];
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col p-container-padding">
+    <div className="flex h-[calc(100vh-8rem)] gap-container-padding p-container-padding">
+      {conversas.length > 0 && (
+        <div className="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto lg:flex">
+          <button
+            onClick={novaConversa}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-body-sm text-on-surface-variant hover:bg-surface-container-high"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            Nova conversa
+          </button>
+          <p className="rotulo px-3 pt-2">Anteriores</p>
+          {conversas.map((c) => (
+            <div
+              key={c.id}
+              className={cn(
+                "group flex items-center justify-between gap-1 rounded-md px-3 py-2 text-body-sm",
+                conversa === c.id
+                  ? "bg-secondary-container text-on-secondary-container"
+                  : "text-on-surface hover:bg-surface-container-high cursor-pointer",
+              )}
+              onClick={() => { if (conversa !== c.id) { setConversa(c.id); setFalas([]); } }}
+            >
+              <span className="truncate">{c.titulo}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); deletarConversa.mutate(c.id); }}
+                className="shrink-0 rounded p-0.5 opacity-0 hover:bg-error-container hover:text-on-error-container group-hover:opacity-100"
+                title="Apagar"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
       <CabecalhoPagina
         titulo="Assistente"
         descricao="Pergunte sobre seus contratos, cartões e cupons. As respostas saem dos seus próprios dados."
@@ -151,6 +209,7 @@ export default function Assistente() {
           <Send className="h-4 w-4" />
           <span className="sr-only">Enviar</span>
         </Button>
+      </div>
       </div>
     </div>
   );

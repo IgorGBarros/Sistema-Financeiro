@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
@@ -214,9 +215,15 @@ export default function Contas() {
             <Lightbulb className="h-8 w-8 text-on-surface-variant" />
             <p className="text-body-md">Nenhuma conta importada.</p>
             <p className="max-w-md text-body-sm text-on-surface-variant">
-              Envie o PDF da conta de luz em Cartões → Importar PDF. Além do
-              valor, o leitor extrai o consumo em kWh e a leitura do medidor.
+              Envie o PDF da conta de luz em Documentos. Além do valor, o
+              leitor extrai o consumo em kWh e a leitura do medidor.
             </p>
+            <Link
+              to="/documentos"
+              className="mt-1 inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-body-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              Ir para Documentos
+            </Link>
           </CardContent>
         </Card>
       ) : (

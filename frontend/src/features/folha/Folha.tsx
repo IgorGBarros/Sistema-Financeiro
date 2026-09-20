@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRightLeft, Check, ChevronDown, Info, Receipt } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Check, CheckCheck, ChevronDown, Info, Receipt } from "lucide-react";
 
 import { api, ApiError, type Holerite } from "@/shared/lib/api";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
@@ -23,22 +24,59 @@ const TIPOS: Record<string, string> = {
 };
 
 export default function Folha() {
+  const anoAtual = new Date().getFullYear();
+  const [ano, setAno] = useState(anoAtual);
+  const [filtroTipo, setFiltroTipo] = useState<"" | string>("");
   const holerites = useQuery({ queryKey: ["holerites"], queryFn: () => api.holerites() });
   const [aberto, setAberto] = useState<string | null>(null);
   const [integrando, setIntegrando] = useState<Holerite | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const confirmar = useMutation({
+    mutationFn: (id: string) => api.confirmarHolerite(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["holerites"] });
+      toast({ title: "Holerite marcado como conferido" });
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao confirmar", description: e.message }),
+  });
 
   const lista = holerites.data ?? [];
-  const ano = new Date().getFullYear();
-  const doAno = lista.filter((h) => h.competencia.startsWith(String(ano)));
+  const doAno = lista.filter(
+    (h) =>
+      h.competencia.startsWith(String(ano)) &&
+      (!filtroTipo || h.tipo_folha === filtroTipo),
+  );
   const liquidoAno = doAno.reduce((t, h) => t + Number(h.valor_liquido), 0);
   const descontosAno = doAno.reduce((t, h) => t + Number(h.total_descontos), 0);
-  const suspeitos = lista.filter((h) => !h.conferencia_ok);
+  const suspeitos = doAno.filter((h) => !h.conferencia_ok);
 
   return (
     <div className="p-container-padding">
       <CabecalhoPagina
         titulo="Folha de pagamento"
         descricao="Holerites importados, verba a verba."
+        acoes={
+          <div className="flex items-center gap-stack-sm">
+            <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1">
+              <Button variant="ghost" size="sm" onClick={() => setAno((a) => a - 1)}>←</Button>
+              <span className="min-w-14 text-center text-body-sm font-semibold">{ano}</span>
+              <Button variant="ghost" size="sm" onClick={() => setAno((a) => a + 1)} disabled={ano >= anoAtual}>→</Button>
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-body-sm"
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+            >
+              <option value="">Todos os tipos</option>
+              {Object.entries(TIPOS).map(([v, r]) => (
+                <option key={v} value={v}>{r}</option>
+              ))}
+            </select>
+          </div>
+        }
       />
 
       {/* O alerta explica por que a integração é manual: garantir que quem integra
@@ -59,7 +97,7 @@ export default function Folha() {
 
       <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
         <Kpi
-          rotulo={`Líquido recebido em ${ano}`}
+          rotulo={`Líquido recebido${filtroTipo ? ` (${TIPOS[filtroTipo] ?? filtroTipo})` : ""} em ${ano}`}
           valor={formatarMoeda(liquidoAno)}
           icone={Receipt}
           tom="receita"
@@ -94,23 +132,37 @@ export default function Folha() {
             <Receipt className="h-8 w-8 text-on-surface-variant" />
             <p className="text-body-md">Nenhum holerite importado.</p>
             <p className="max-w-md text-body-sm text-on-surface-variant">
-              Envie o recibo de pagamento em PDF pela tela de Cartões → Importar PDF.
-              O leitor reconhece folha mensal, 13º e férias.
+              Envie o recibo de pagamento em PDF pela tela de Documentos. O
+              leitor reconhece folha mensal, 13º e férias.
             </p>
+            <Link
+              to="/documentos"
+              className="mt-1 inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-body-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              Ir para Documentos
+            </Link>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-stack-sm">
-          {lista.map((holerite) => (
-            <LinhaHolerite
-              key={holerite.id}
-              holerite={holerite}
-              aberto={aberto === holerite.id}
-              onAlternar={() => setAberto(aberto === holerite.id ? null : holerite.id)}
-              onIntegrar={() => setIntegrando(holerite)}
-            />
-          ))}
-        </div>
+        {doAno.length === 0 ? (
+          <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">
+            Nenhum holerite em {ano}{filtroTipo ? ` do tipo ${TIPOS[filtroTipo] ?? filtroTipo}` : ""}.
+          </p>
+        ) : (
+          <div className="space-y-stack-sm">
+            {doAno.map((holerite) => (
+              <LinhaHolerite
+                key={holerite.id}
+                holerite={holerite}
+                aberto={aberto === holerite.id}
+                onAlternar={() => setAberto(aberto === holerite.id ? null : holerite.id)}
+                onIntegrar={() => setIntegrando(holerite)}
+                onConfirmar={() => confirmar.mutate(holerite.id)}
+                confirmando={confirmar.isPending && confirmar.variables === holerite.id}
+              />
+            ))}
+          </div>
+        )}
       )}
 
       <DialogIntegrar holerite={integrando} onFechar={() => setIntegrando(null)} />
@@ -198,11 +250,15 @@ function LinhaHolerite({
   aberto,
   onAlternar,
   onIntegrar,
+  onConfirmar,
+  confirmando,
 }: {
   holerite: Holerite;
   aberto: boolean;
   onAlternar: () => void;
   onIntegrar: () => void;
+  onConfirmar: () => void;
+  confirmando: boolean;
 }) {
   const vencimentos = holerite.verbas.filter((v) => v.natureza === "VENCIMENTO");
   const descontos = holerite.verbas.filter((v) => v.natureza === "DESCONTO");
@@ -222,12 +278,6 @@ function LinhaHolerite({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-stack-md">
-          {!holerite.conferencia_ok && (
-            <Selo tom="aviso">
-              <AlertTriangle className="h-3 w-3" />
-              Conferir
-            </Selo>
-          )}
           {holerite.integrado ? (
             <Selo tom="sucesso">
               <Check className="h-3 w-3" />
@@ -242,7 +292,17 @@ function LinhaHolerite({
               <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
               Integrar
             </Button>
-          ) : null}
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={confirmando}
+              onClick={(e) => { e.stopPropagation(); onConfirmar(); }}
+            >
+              <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
+              {confirmando ? "Confirmando…" : "Conferido"}
+            </Button>
+          )}
           <span className="tabular text-body-lg font-semibold text-receita">
             {formatarMoeda(holerite.valor_liquido)}
           </span>

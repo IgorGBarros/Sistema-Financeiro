@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -45,9 +46,15 @@ export default function Financiamento() {
             <p className="text-body-md">Nenhum financiamento importado.</p>
             <p className="max-w-md text-body-sm text-on-surface-variant">
               Envie o Demonstrativo Descritivo de Crédito (DDC) do banco em
-              Cartões → Importar PDF. Ele traz a tabela inteira, com a situação
-              de cada parcela.
+              Documentos. Ele traz a tabela inteira, com a situação de cada
+              parcela.
             </p>
+            <Link
+              to="/documentos"
+              className="mt-1 inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-body-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              Ir para Documentos
+            </Link>
           </CardContent>
         </Card>
       ) : (

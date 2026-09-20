@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ const esquema = z
     descricao: z.string().min(2, "Dê um nome que você reconheça na lista."),
     tipo: z.enum(["RECEITA", "DESPESA"]),
     tipo_registro: z.enum(["CONTRATO_FECHADO", "PREVISAO", "RECORRENCIA"]).default("CONTRATO_FECHADO"),
+    tipo_conta: z.enum(["FIXO", "VARIAVEL"]).default("FIXO"),
     categoria: z.string().uuid("Escolha uma categoria."),
     estabelecimento: z.string().uuid("Escolha de onde vem ou para onde vai."),
     valor_unitario: z.coerce.number().positive("O valor precisa ser maior que zero."),
@@ -64,6 +65,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
     defaultValues: {
       tipo: "DESPESA",
       tipo_registro: "CONTRATO_FECHADO" as const,
+      tipo_conta: "FIXO" as const,
       frequencia: "M",
       reajuste_anual_pct: 0,
       descricao: "",
@@ -85,6 +87,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
         descricao: fonte.descricao ?? "",
         tipo: fonte.tipo ?? "DESPESA",
         tipo_registro: (fonte.tipo_registro as "CONTRATO_FECHADO" | "PREVISAO" | "RECORRENCIA") ?? "CONTRATO_FECHADO",
+        tipo_conta: (fonte.tipo_conta as "FIXO" | "VARIAVEL") ?? "FIXO",
         categoria: fonte.categoria ?? "",
         estabelecimento: fonte.estabelecimento ?? "",
         valor_unitario: Number(fonte.valor_unitario ?? 0),
@@ -147,6 +150,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
           descricao: dados.descricao,
           tipo: dados.tipo,
           tipo_registro: dados.tipo_registro,
+          tipo_conta: dados.tipo_conta,
           categoria: dados.categoria,
           classificacao: categoriaEscolhida?.classificacao,
           estabelecimento: dados.estabelecimento,
@@ -302,7 +306,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
             </Campo>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Campo rotulo="Reajuste anual (%)">
               <Input
                 type="number"
@@ -319,6 +323,15 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
                 {TIPOS_REGISTRO.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.rotulo}</option>
                 ))}
+              </select>
+            </Campo>
+            <Campo rotulo="Tipo de valor">
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...formulario.register("tipo_conta")}
+              >
+                <option value="FIXO">Fixo</option>
+                <option value="VARIAVEL">Variável</option>
               </select>
             </Campo>
           </div>
@@ -362,9 +375,10 @@ function Campo({
   erro?: string;
   children: React.ReactNode;
 }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <label className="text-sm font-medium">{rotulo}</label>
+      <label htmlFor={id} className="text-sm font-medium">{rotulo}</label>
       {children}
       {erro && <p className="text-xs text-destructive">{erro}</p>}
     </div>

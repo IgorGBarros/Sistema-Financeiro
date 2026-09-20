@@ -218,7 +218,11 @@ export default function FluxoCaixa() {
 
       <Card>
         <CardContent className="h-[380px] pt-6">
-          {fluxo.isLoading ? (
+          {fluxo.isError ? (
+            <div className="flex h-full items-center justify-center text-sm text-error">
+              Não foi possível carregar o fluxo de caixa. Verifique sua conexão e tente novamente.
+            </div>
+          ) : fluxo.isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Carregando a projeção…
             </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -84,6 +84,16 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
 
   const fechamento = Number(formulario.watch("dia_fechamento"));
   const vencimento = Number(formulario.watch("dia_vencimento"));
+
+  const desativar = useMutation({
+    mutationFn: () => api.salvarCartao({ ativo: false }, cartao!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cartoes"] });
+      toast({ title: "Cartão desativado" });
+      onFechar();
+    },
+    onError: (erro: ApiError) => setErroGeral(erro.message),
+  });
 
   const salvar = useMutation({
     mutationFn: (dados: Formulario) =>
@@ -200,13 +210,26 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
             </p>
           )}
 
-          <div className="flex justify-end gap-stack-sm pt-2">
-            <Button type="button" variant="ghost" onClick={onFechar}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={salvar.isPending}>
-              {salvar.isPending ? "Salvando…" : "Salvar"}
-            </Button>
+          <div className="flex items-center justify-between pt-2">
+            {cartao ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-error hover:bg-error-container hover:text-on-error-container"
+                disabled={salvar.isPending}
+                onClick={() => desativar.mutate()}
+              >
+                Desativar cartão
+              </Button>
+            ) : <span />}
+            <div className="flex gap-stack-sm">
+              <Button type="button" variant="ghost" onClick={onFechar}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={salvar.isPending}>
+                {salvar.isPending ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
@@ -225,9 +248,10 @@ function Campo({
   ajuda?: string;
   children: React.ReactNode;
 }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <label className="text-body-sm font-medium">{rotulo}</label>
+      <label htmlFor={id} className="text-body-sm font-medium">{rotulo}</label>
       {children}
       {erro ? (
         <p className="text-[11px] text-error">{erro}</p>

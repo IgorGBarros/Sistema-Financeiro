@@ -99,7 +99,11 @@ export default function Metas() {
         }
       />
 
-      {metas.isLoading ? (
+      {metas.isError ? (
+        <p className="py-stack-lg text-center text-body-sm text-error">
+          Não foi possível carregar as metas. Verifique sua conexão e tente novamente.
+        </p>
+      ) : metas.isLoading ? (
         <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">Carregando…</p>
       ) : lista.length === 0 ? (
         <div className="cartao flex flex-col items-center gap-3 p-stack-lg text-center">

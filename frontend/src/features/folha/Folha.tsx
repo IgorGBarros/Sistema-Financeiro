@@ -27,7 +27,10 @@ export default function Folha() {
   const anoAtual = new Date().getFullYear();
   const [ano, setAno] = useState(anoAtual);
   const [filtroTipo, setFiltroTipo] = useState<"" | string>("");
-  const holerites = useQuery({ queryKey: ["holerites"], queryFn: () => api.holerites() });
+  const holerites = useQuery({
+    queryKey: ["holerites", { page_size: "60" }],
+    queryFn: () => api.holerites({ page_size: "60" }),
+  });
   const [aberto, setAberto] = useState<string | null>(null);
   const [integrando, setIntegrando] = useState<Holerite | null>(null);
   const queryClient = useQueryClient();
@@ -143,26 +146,24 @@ export default function Folha() {
             </Link>
           </CardContent>
         </Card>
+      ) : doAno.length === 0 ? (
+        <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">
+          Nenhum holerite em {ano}{filtroTipo ? ` do tipo ${TIPOS[filtroTipo] ?? filtroTipo}` : ""}.
+        </p>
       ) : (
-        {doAno.length === 0 ? (
-          <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">
-            Nenhum holerite em {ano}{filtroTipo ? ` do tipo ${TIPOS[filtroTipo] ?? filtroTipo}` : ""}.
-          </p>
-        ) : (
-          <div className="space-y-stack-sm">
-            {doAno.map((holerite) => (
-              <LinhaHolerite
-                key={holerite.id}
-                holerite={holerite}
-                aberto={aberto === holerite.id}
-                onAlternar={() => setAberto(aberto === holerite.id ? null : holerite.id)}
-                onIntegrar={() => setIntegrando(holerite)}
-                onConfirmar={() => confirmar.mutate(holerite.id)}
-                confirmando={confirmar.isPending && confirmar.variables === holerite.id}
-              />
-            ))}
-          </div>
-        )}
+        <div className="space-y-stack-sm">
+          {doAno.map((holerite) => (
+            <LinhaHolerite
+              key={holerite.id}
+              holerite={holerite}
+              aberto={aberto === holerite.id}
+              onAlternar={() => setAberto(aberto === holerite.id ? null : holerite.id)}
+              onIntegrar={() => setIntegrando(holerite)}
+              onConfirmar={() => confirmar.mutate(holerite.id)}
+              confirmando={confirmar.isPending && confirmar.variables === holerite.id}
+            />
+          ))}
+        </div>
       )}
 
       <DialogIntegrar holerite={integrando} onFechar={() => setIntegrando(null)} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -192,9 +192,10 @@ export function FormularioRealizado({ aberto, realizado, onFechar }: Props) {
 }
 
 function Campo({ rotulo, erro, children }: { rotulo: string; erro?: string; children: React.ReactNode }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
-      <label className="text-sm font-medium text-on-surface">{rotulo}</label>
+      <label htmlFor={id} className="text-sm font-medium text-on-surface">{rotulo}</label>
       {children}
       {erro && <p className="text-xs text-error">{erro}</p>}
     </div>

@@ -192,7 +192,11 @@ export default function Realizados() {
           </p>
         </div>
 
-        {parcelas.isLoading ? (
+        {parcelas.isError || realizados.isError ? (
+          <p className="p-stack-lg text-center text-body-sm text-error">
+            Não foi possível carregar os dados. Verifique sua conexão e tente novamente.
+          </p>
+        ) : parcelas.isLoading ? (
           <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
             Carregando…
           </p>

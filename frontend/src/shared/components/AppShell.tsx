@@ -14,6 +14,7 @@ import {
   Menu,
   Moon,
   Receipt,
+  RefreshCcw,
   Scale,
   Target,
   Search,
@@ -86,6 +87,7 @@ const NAVEGACAO = [
       { para: "/plano-de-contas", rotulo: "Plano de contas", icone: FolderTree },
       { para: "/catalogo", rotulo: "Catálogo", icone: Tags },
       { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
+      { para: "/turnaround", rotulo: "Turnaround", icone: RefreshCcw },
     ],
   },
 ];

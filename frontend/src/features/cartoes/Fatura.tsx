@@ -60,6 +60,12 @@ export default function Fatura() {
     enabled: Boolean(id),
   });
 
+  const pendencias = useQuery({
+    queryKey: ["fatura-pendencias", id],
+    queryFn: () => api.pendenciasFatura(id!),
+    enabled: Boolean(id),
+  });
+
   const { pendentes, conciliados, futuros, soma } = useMemo(() => {
     const linhas = fatura.data?.lancamentos ?? [];
     const correntes = linhas.filter((l) => l.secao === "CORRENTE");
@@ -140,7 +146,11 @@ export default function Fatura() {
           valor={String(pendentes.length)}
           icone={AlertTriangle}
           tom={pendentes.length ? "despesa" : "neutro"}
-          apoio="Compras sem cupom escaneado"
+          apoio={
+            pendencias.data
+              ? `${pendencias.data.sem_categoria} sem categoria definida`
+              : "Compras sem cupom escaneado"
+          }
         />
       </div>
 

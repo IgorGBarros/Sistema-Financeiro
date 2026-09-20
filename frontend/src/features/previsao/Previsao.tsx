@@ -26,6 +26,11 @@ export default function Previsao() {
     queryFn: () => api.previsao(horizonte, saldoInicial || "0"),
   });
 
+  const modelos = useQuery({
+    queryKey: ["modelos-previsao"],
+    queryFn: () => api.modelosPrevisao(),
+  });
+
   const dados = previsao.data;
 
   /**
@@ -353,6 +358,29 @@ export default function Previsao() {
                 cada vez. Vence quem erra menos em reais. Sem ganho relevante
                 sobre o mais simples, fica o mais simples.
               </p>
+            </>
+          )}
+
+          {(modelos.data?.modelos ?? []).length > 0 && (
+            <>
+              <p className="rotulo mt-stack-md border-b border-outline-variant pb-1">
+                Disponibilidade dos modelos
+              </p>
+              <p className="mt-1 text-[11px] text-on-surface-variant">
+                {modelos.data!.meses_de_historico} mês(es) de histórico registrados.
+              </p>
+              <div className="mt-stack-sm space-y-1">
+                {modelos.data!.modelos.map((m) => (
+                  <div key={m.nome} className="flex items-center justify-between gap-2 text-body-sm">
+                    <span className={cn("truncate", !m.disponivel && "text-on-surface-variant/50")}>
+                      {m.descricao}
+                    </span>
+                    <Selo tom={m.disponivel ? "sucesso" : "neutro"}>
+                      {m.disponivel ? "pronto" : `min ${m.minimo_observacoes}m`}
+                    </Selo>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </div>

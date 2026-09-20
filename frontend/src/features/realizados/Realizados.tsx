@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Check, CircleDollarSign, Clock, Download, MessageSquare, Pencil, Plus, Trash2, Wallet } from "lucide-react";
+import { CalendarCheck, Check, CircleDollarSign, Clock, Download, Link2, MessageSquare, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
 import { api, ApiError, type Parcela, type Realizado } from "@/shared/lib/api";
 import { exportarCsv } from "@/shared/lib/exportar";
@@ -40,6 +40,9 @@ export default function Realizados() {
   const [excluindo, setExcluindo] = useState<Realizado | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<"TODOS" | "RECEITA" | "DESPESA">("TODOS");
   const [filtroClassificacao, setFiltroClassificacao] = useState<string>("TODAS");
+  const [filtroOrigem, setFiltroOrigem] = useState<string>("TODAS");
+  const [vincularAberto, setVincularAberto] = useState(false);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const parcelas = useQuery({
@@ -67,27 +70,21 @@ export default function Realizados() {
     return Array.from(nomes).sort();
   }, [realizados.data]);
 
+  const origens = useMemo(() => {
+    const set = new Set((realizados.data ?? []).map((r) => r.origem));
+    return Array.from(set).sort();
+  }, [realizados.data]);
+
   const realizadosFiltrados = useMemo(() => {
     return (realizados.data ?? []).filter((r) => {
       if (filtroTipo !== "TODOS" && r.tipo !== filtroTipo) return false;
       if (filtroClassificacao !== "TODAS" && r.classificacao_nome !== filtroClassificacao) return false;
+      if (filtroOrigem !== "TODAS" && r.origem !== filtroOrigem) return false;
       return true;
     });
-  }, [realizados.data, filtroTipo, filtroClassificacao]);
+  }, [realizados.data, filtroTipo, filtroClassificacao, filtroOrigem]);
 
   const totalPago = realizadosFiltrados.reduce((t, r) => t + Number(r.valor), 0);
-
-  const excluir = useMutation({
-    mutationFn: (id: string) => api.deletarRealizado(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["realizados"] });
-      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-      toast({ title: "Lançamento excluído" });
-      setExcluindo(null);
-    },
-    onError: (e: ApiError) =>
-      toast({ variant: "destructive", title: "Erro ao excluir", description: e.message }),
-  });
 
   const excluir = useMutation({
     mutationFn: (id: string) => api.deletarRealizado(id),
@@ -133,6 +130,10 @@ export default function Realizados() {
           >
             <Download className="mr-2 h-4 w-4" />
             Exportar CSV
+          </Button>
+          <Button variant="outline" onClick={() => setVincularAberto(true)}>
+            <Link2 className="mr-2 h-4 w-4" />
+            Vincular órfãos
           </Button>
           <Button onClick={() => { setEditando(null); setFormularioAberto(true); }}>
             <Plus className="mr-2 h-4 w-4" />
@@ -297,6 +298,18 @@ export default function Realizados() {
                   ))}
                 </select>
               )}
+              {origens.length > 1 && (
+                <select
+                  className="rounded border border-outline-variant bg-surface-container-low px-2 py-1 text-body-sm text-on-surface"
+                  value={filtroOrigem}
+                  onChange={(e) => setFiltroOrigem(e.target.value)}
+                >
+                  <option value="TODAS">Todas as origens</option>
+                  {origens.map((o) => (
+                    <option key={o} value={o}>{o.toLowerCase()}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -369,6 +382,8 @@ export default function Realizados() {
 
       <DialogoBaixa parcela={baixando} onFechar={() => setBaixando(null)} />
 
+      <DialogVincularOrfaos aberto={vincularAberto} onFechar={() => setVincularAberto(false)} />
+
       <FormularioRealizado
         aberto={formularioAberto}
         realizado={editando}
@@ -385,6 +400,94 @@ export default function Realizados() {
         onFechar={() => setExcluindo(null)}
       />
     </div>
+  );
+}
+
+/**
+ * Vincula lançamentos sem contrato ao contrato de mesma descrição.
+ *
+ * GET simula; POST aplica. Útil após importar extratos antigos: as descrições
+ * coincidem mas o campo contrato chegou em branco.
+ */
+function DialogVincularOrfaos({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const simulacao = useQuery({
+    queryKey: ["vincular-realizados-simulacao"],
+    queryFn: () => api.simularVinculoRealizados(),
+    enabled: aberto,
+  });
+
+  const aplicar = useMutation({
+    mutationFn: () => api.aplicarVinculoRealizados(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["realizados"] });
+      toast({ title: `${res.vinculados.length} lançamento(s) vinculado(s)` });
+      onFechar();
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao vincular", description: e.message }),
+  });
+
+  const dados = simulacao.data;
+
+  return (
+    <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Vincular lançamentos órfãos</DialogTitle>
+        </DialogHeader>
+
+        {simulacao.isLoading ? (
+          <p className="py-4 text-center text-body-sm text-on-surface-variant">Simulando…</p>
+        ) : !dados ? null : (
+          <div className="space-y-4">
+            <p className="text-body-sm text-on-surface-variant">
+              {dados.total_orfaos} lançamento(s) sem contrato no histórico.{" "}
+              {dados.vinculados.length > 0
+                ? `${dados.vinculados.length} podem ser vinculados por descrição.`
+                : "Nenhum pode ser vinculado automaticamente."}
+            </p>
+
+            {dados.vinculados.length > 0 && (
+              <div className="max-h-60 overflow-y-auto rounded-md border border-outline-variant">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-outline-variant bg-surface-container-low">
+                      <th className="rotulo px-gutter-table py-1.5">Lançamento</th>
+                      <th className="rotulo px-gutter-table py-1.5">Contrato</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-body-sm">
+                    {dados.vinculados.map((v, i) => (
+                      <tr key={i} className="h-[36px] border-b border-outline-variant">
+                        <td className="max-w-[180px] truncate px-gutter-table text-on-surface">
+                          {v.realizado_descricao ?? v.realizado}
+                        </td>
+                        <td className="max-w-[180px] truncate px-gutter-table text-on-surface-variant">
+                          {v.contrato_descricao ?? v.contrato}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={onFechar}>Fechar</Button>
+              {dados.vinculados.length > 0 && (
+                <Button onClick={() => aplicar.mutate()} disabled={aplicar.isPending}>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  {aplicar.isPending ? "Vinculando…" : `Aplicar (${dados.vinculados.length})`}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

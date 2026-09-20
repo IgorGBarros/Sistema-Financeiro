@@ -5,11 +5,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.api import workspace_do_request
-from apps.relatorios.serializers import FluxoMensalSerializer
+from apps.common.api import WorkspaceViewSet, workspace_do_request
+from apps.relatorios.models import MetaOrcamentaria
+from apps.relatorios.serializers import FluxoMensalSerializer, MetaOrcamentariaSerializer
 from apps.relatorios.services import fluxo_caixa
 
 from apps.common.datas import hoje_local
+
+
+class MetaOrcamentariaViewSet(WorkspaceViewSet):
+    """CRUD de metas orçamentárias por categoria."""
+    queryset = MetaOrcamentaria.objects.select_related("categoria")
+    serializer_class = MetaOrcamentariaSerializer
 
 
 

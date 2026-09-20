@@ -813,6 +813,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ data_rescisao }),
     }),
+  deletarContrato: (id: string) =>
+    request<void>(`/contratos/${id}/`, { method: "DELETE" }),
 
   /** Envia o conteúdo do QR Code lido pela câmera. */
   scanNota: (conteudo: string, categoria?: string) =>

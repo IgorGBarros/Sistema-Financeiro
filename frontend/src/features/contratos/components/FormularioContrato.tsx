@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 import { z } from "zod";
 
 import { api, ApiError, type Contrato, type Frequencia } from "@/shared/lib/api";
@@ -59,6 +60,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   const formulario = useForm<Formulario>({
     resolver: zodResolver(esquema),
@@ -100,6 +102,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
       formulario.reset();
     }
     setErroGeral(null);
+    setConfirmarExclusao(false);
   }, [aberto, contrato, dadosIniciais]);
 
   const categorias = useQuery({
@@ -140,6 +143,20 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
         reajuste_anual_pct: String(valores.reajuste_anual_pct ?? 0),
       }),
     enabled: aberto && podeSimular,
+  });
+
+  const excluir = useMutation({
+    mutationFn: () => api.deletarContrato(contrato!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contratos"] });
+      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      toast({ title: "Contrato excluído", description: "As parcelas foram removidas." });
+      onFechar();
+    },
+    onError: (e: Error) => {
+      toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+      setConfirmarExclusao(false);
+    },
   });
 
   const salvar = useMutation({
@@ -352,13 +369,60 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onFechar}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={salvar.isPending}>
-              {salvar.isPending ? "Salvando…" : "Salvar"}
-            </Button>
+          {confirmarExclusao ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                Excluir permanentemente?
+              </p>
+              <p className="text-xs text-on-surface-variant">
+                Todas as parcelas previstas serão removidas. Esta ação não tem desfazer.
+              </p>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => excluir.mutate()}
+                  disabled={excluir.isPending}
+                >
+                  {excluir.isPending ? "Excluindo…" : "Sim, excluir"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmarExclusao(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-between pt-2">
+            {contrato ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setConfirmarExclusao(true)}
+                disabled={salvar.isPending}
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={onFechar}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={salvar.isPending}>
+                {salvar.isPending ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

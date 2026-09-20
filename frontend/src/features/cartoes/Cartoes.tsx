@@ -1,12 +1,12 @@
-import { useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, CreditCard, FileUp, Landmark, Loader2, Plus, TrendingUp,
+  AlertTriangle, CreditCard, FileUp, Plus, TrendingUp,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
 
-import { api, ApiError, type Cartao } from "@/shared/lib/api";
+import { api, type Cartao } from "@/shared/lib/api";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { FormularioCartao } from "@/features/cartoes/components/FormularioCartao";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
@@ -15,8 +15,6 @@ import { Selo } from "@/shared/components/Selo";
 import { TabelaMatriz } from "@/shared/components/TabelaMatriz";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
-import { Input } from "@/shared/ui/input";
-import { useToast } from "@/shared/ui/use-toast";
 import { cn } from "@/shared/lib/utils";
 
 const HORIZONTES = [6, 12, 24];
@@ -195,7 +193,21 @@ export default function Cartoes() {
       <ListaFaturas />
 
       <div className="mt-container-padding">
-        <ImportacaoFatura />
+        <div className="cartao p-container-padding flex items-center justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-headline-sm text-on-surface">
+              <FileUp className="h-5 w-5 text-secondary" />
+              Importar fatura em PDF
+            </h2>
+            <p className="mt-1 text-body-sm text-on-surface-variant">
+              Leia os lançamentos da fatura, separe parcelas futuras e concilie
+              com as compras já registradas.
+            </p>
+          </div>
+          <Button asChild className="shrink-0">
+            <Link to="/documentos">Importar PDF</Link>
+          </Button>
+        </div>
       </div>
 
       <FormularioCartao
@@ -347,139 +359,3 @@ function ListaFaturas() {
   );
 }
 
-/**
- * Duas entradas para os dados da fatura: o PDF, que funciona hoje, e o Open
- * Finance, que depende de coisas fora do nosso controle.
- */
-function ImportacaoFatura() {
-  const [senha, setSenha] = useState("");
-  const arquivoRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const importar = useMutation({
-    mutationFn: ({ arquivo, simular }: { arquivo: File; simular: boolean }) =>
-      api.importarDocumento(arquivo, { senha, simular }),
-    onSuccess: (documento) => {
-      queryClient.invalidateQueries({ queryKey: ["cartoes"] });
-      queryClient.invalidateQueries({ queryKey: ["documentos"] });
-      if (documento.avisos?.length) {
-        toast({
-          title: "Importado com ressalvas",
-          description: documento.avisos[0],
-        });
-      } else {
-        toast({
-          title: "Fatura importada",
-          description: `${documento.tipo} — ${documento.competencia ?? "sem competência"}.`,
-        });
-      }
-    },
-    onError: (erro: ApiError) =>
-      toast({ variant: "destructive", title: "Não deu para importar", description: erro.message }),
-  });
-
-  function enviar(simular: boolean) {
-    const arquivo = arquivoRef.current?.files?.[0];
-    if (!arquivo) {
-      toast({ title: "Escolha o PDF da fatura primeiro" });
-      return;
-    }
-    importar.mutate({ arquivo, simular });
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-container-padding lg:grid-cols-2">
-      <div className="cartao p-container-padding">
-        <h2 className="flex items-center gap-2 text-headline-sm text-on-surface">
-          <FileUp className="h-5 w-5 text-secondary" />
-          Importar PDF da fatura
-        </h2>
-        <p className="mt-1 text-body-sm text-on-surface-variant">
-          O sistema lê os lançamentos, separa as parcelas de faturas futuras e
-          concilia com as compras que você já registrou.
-        </p>
-
-        <div className="mt-stack-md space-y-stack-sm">
-          <input
-            ref={arquivoRef}
-            type="file"
-            accept="application/pdf"
-            className="block w-full text-body-sm file:mr-3 file:rounded-md file:border file:border-outline-variant file:bg-surface-container file:px-3 file:py-1.5 file:text-body-sm"
-          />
-          <Input
-            type="password"
-            placeholder="Senha do PDF, se houver"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-          />
-          <div className="flex gap-stack-sm">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => enviar(true)}
-              disabled={importar.isPending}
-            >
-              {importar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Simular
-            </Button>
-            <Button className="flex-1" onClick={() => enviar(false)} disabled={importar.isPending}>
-              Importar
-            </Button>
-          </div>
-          <p className="text-[11px] text-on-surface-variant">
-            Use <strong>Simular</strong> na primeira vez com um emissor novo: mostra
-            o que o leitor entendeu sem gravar nada.
-          </p>
-        </div>
-
-        {importar.data && (
-          <div className="mt-stack-md rounded-lg border border-outline-variant bg-surface-container-low p-stack-sm text-body-sm">
-            <p className="font-medium">
-              {importar.data.tipo} · {importar.data.linhas?.length ?? 0} linha(s)
-            </p>
-            {importar.data.avisos?.map((aviso) => (
-              <p key={aviso} className="mt-1 text-[12px] text-amber-700 dark:text-amber-400">
-                {aviso}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="cartao p-container-padding">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-headline-sm text-on-surface">
-            <Landmark className="h-5 w-5 text-on-surface-variant" />
-            Open Finance
-          </h2>
-          <Selo>Ainda não disponível</Selo>
-        </div>
-
-        {/* Ser honesto sobre a barreira aqui evita meses de expectativa: o
-            obstáculo não é código. */}
-        <p className="mt-1 text-body-sm text-on-surface-variant">
-          Puxar fatura e extrato direto do banco, sem PDF e sem senha.
-        </p>
-        <div className="mt-stack-md space-y-stack-sm text-body-sm text-on-surface-variant">
-          <p>
-            O acesso ao Open Finance é restrito a instituições autorizadas pelo
-            Banco Central. Uma pessoa física não consegue se conectar
-            diretamente, mesmo aos próprios dados.
-          </p>
-          <p>
-            O caminho viável é um agregador já autorizado — Pluggy, Belvo e
-            Klavi são os mais usados no Brasil. Eles cobram por conexão ativa
-            e exigem contrato.
-          </p>
-          <p className="rounded-lg border border-outline-variant bg-surface-container-low p-stack-sm">
-            <strong className="text-on-surface">O que já está pronto:</strong> a
-            importação grava a origem de cada documento, e o modelo aceita
-            lançamento vindo de outra fonte sem mudança. Quando um agregador
-            entrar, é um extrator novo — o resto do caminho não muda.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}

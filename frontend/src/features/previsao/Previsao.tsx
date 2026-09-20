@@ -154,6 +154,56 @@ export default function Previsao() {
         </Card>
       )}
 
+      {/* Próximos 3 meses — leitura rápida sem ter que rolar o gráfico */}
+      {(dados?.meses ?? []).length > 0 && (
+        <div className="cartao mb-container-padding overflow-hidden">
+          <div className="border-b border-outline-variant bg-surface p-stack-md">
+            <h2 className="text-headline-sm text-on-surface">Próximos 3 meses</h2>
+            <p className="mt-1 text-body-sm text-on-surface-variant">
+              Previsto vs. realizado e saldo estimado para cada mês.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-outline-variant bg-surface-container-low">
+                  <th className="rotulo px-gutter-table py-2">Mês</th>
+                  <th className="rotulo px-gutter-table py-2 text-right">Contratado</th>
+                  <th className="rotulo px-gutter-table py-2 text-right">Resultado prev.</th>
+                  <th className="rotulo px-gutter-table py-2 text-right">Saldo estimado</th>
+                  <th className="rotulo px-gutter-table py-2 text-center">Risco negativo</th>
+                </tr>
+              </thead>
+              <tbody className="text-body-sm">
+                {(dados.meses ?? []).slice(0, 3).map((mes) => {
+                  const saldo50 = Number(mes.saldo_p50);
+                  const resultado = Number(mes.resultado_p50);
+                  return (
+                    <tr key={mes.competencia} className="h-[40px] border-b border-outline-variant">
+                      <td className="px-gutter-table font-medium text-on-surface">
+                        {formatarCompetencia(mes.competencia)}
+                      </td>
+                      <td className="px-gutter-table text-right tabular text-on-surface">
+                        {formatarMoeda(mes.contratado)}
+                      </td>
+                      <td className={`px-gutter-table text-right tabular ${resultado >= 0 ? "text-receita" : "text-despesa"}`}>
+                        {formatarMoeda(mes.resultado_p50)}
+                      </td>
+                      <td className={`px-gutter-table text-right tabular font-semibold ${saldo50 < 0 ? "text-despesa" : "text-on-surface"}`}>
+                        {formatarMoeda(mes.saldo_p50)}
+                      </td>
+                      <td className="px-gutter-table text-center text-on-surface-variant">
+                        {(mes.probabilidade_negativo * 100).toFixed(0)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="cartao mb-container-padding p-container-padding">
         <h2 className="text-headline-sm text-on-surface">Saldo projetado</h2>
         <p className="mb-stack-md mt-1 text-body-sm text-on-surface-variant">

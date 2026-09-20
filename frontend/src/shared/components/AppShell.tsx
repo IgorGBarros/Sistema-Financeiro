@@ -9,6 +9,7 @@ import {
   FolderTree,
   LayoutDashboard,
   Lightbulb,
+  LineChart,
   Menu,
   Moon,
   Receipt,
@@ -24,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 
+import { AlertasContratos } from "@/shared/components/AlertasContratos";
 import { AlertasVencimento } from "@/shared/components/AlertasVencimento";
 import { BarraStatus } from "@/shared/components/BarraStatus";
 import { BuscaGlobal } from "@/shared/components/BuscaGlobal";
@@ -78,6 +80,7 @@ const NAVEGACAO = [
     itens: [
       { para: "/aderencia", rotulo: "Aderência", icone: Scale },
       { para: "/metas", rotulo: "Metas", icone: Target },
+      { para: "/evolucao-categoria", rotulo: "Evolução cat.", icone: LineChart },
       { para: "/plano-de-contas", rotulo: "Plano de contas", icone: FolderTree },
       { para: "/catalogo", rotulo: "Catálogo", icone: Tags },
       { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
@@ -222,6 +225,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <BarraStatus />
+        <AlertasContratos />
         <AlertasVencimento />
 
         <main className="flex-1 overflow-x-hidden">{children}</main>

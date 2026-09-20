@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, ArrowDownToLine, ArrowUpFromLine, List, ListChecks, Plus,
-  Scale, SlidersHorizontal, Table2, TrendingUp, XCircle,
+  AlertCircle, ArrowDownToLine, ArrowUpFromLine, Copy, ExternalLink, List,
+  ListChecks, Plus, Scale, SlidersHorizontal, Table2, TrendingUp, XCircle,
 } from "lucide-react";
 
 import { api, type Contrato, type TipoLancamento } from "@/shared/lib/api";
@@ -39,6 +40,7 @@ export default function Contratos() {
   const [visao, setVisao] = useState<Visao>("lista");
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Contrato | null>(null);
+  const [dadosDuplicacao, setDadosDuplicacao] = useState<Partial<Contrato> | undefined>();
   const [rescindirAberto, setRescindirAberto] = useState(false);
   const [emRescisao, setEmRescisao] = useState<Contrato | null>(null);
 
@@ -68,7 +70,14 @@ export default function Contratos() {
   const lista = contratos.data ?? [];
 
   function abrir(contrato: Contrato | null) {
+    setDadosDuplicacao(undefined);
     setEmEdicao(contrato);
+    setFormularioAberto(true);
+  }
+
+  function duplicar(contrato: Contrato) {
+    setEmEdicao(null);
+    setDadosDuplicacao({ ...contrato, id: undefined });
     setFormularioAberto(true);
   }
 
@@ -282,6 +291,24 @@ export default function Contratos() {
                             >
                               <ListChecks className="h-4 w-4" />
                             </button>
+                            <Link
+                              to={`/contratos/${contrato.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high hover:text-secondary"
+                              title="Ver detalhes e linha do tempo"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Link>
+                            <button
+                              className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high hover:text-secondary"
+                              title="Duplicar contrato"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicar(contrato);
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
                             {contrato.status === "ATIVO" && (
                               <button
                                 className="rounded p-1 text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
@@ -319,7 +346,14 @@ export default function Contratos() {
       <FormularioContrato
         aberto={formularioAberto}
         contrato={emEdicao}
-        onFechar={() => setFormularioAberto(false)}
+        dadosIniciais={dadosDuplicacao}
+        onFechar={() => { setFormularioAberto(false); setDadosDuplicacao(undefined); }}
+      />
+
+      <ModalRescindir
+        aberto={rescindirAberto}
+        contrato={emRescisao}
+        onFechar={() => { setRescindirAberto(false); setEmRescisao(null); }}
       />
 
       <ModalRescindir

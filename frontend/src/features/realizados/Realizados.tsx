@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Check, CircleDollarSign, Clock, Download, Pencil, Plus, Trash2, Wallet } from "lucide-react";
+import { CalendarCheck, Check, CircleDollarSign, Clock, Download, MessageSquare, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
 import { api, ApiError, type Parcela, type Realizado } from "@/shared/lib/api";
 import { exportarCsv } from "@/shared/lib/exportar";
@@ -38,6 +38,8 @@ export default function Realizados() {
   const [editando, setEditando] = useState<Realizado | null>(null);
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [excluindo, setExcluindo] = useState<Realizado | null>(null);
+  const [filtroTipo, setFiltroTipo] = useState<"TODOS" | "RECEITA" | "DESPESA">("TODOS");
+  const [filtroClassificacao, setFiltroClassificacao] = useState<string>("TODAS");
   const { toast } = useToast();
 
   const parcelas = useQuery({
@@ -59,7 +61,33 @@ export default function Realizados() {
   }, [parcelas.data]);
 
   const totalPendente = pendentes.reduce((t, p) => t + Number(p.valor_previsto), 0);
-  const totalPago = (realizados.data ?? []).reduce((t, r) => t + Number(r.valor), 0);
+
+  const classificacoes = useMemo(() => {
+    const nomes = new Set((realizados.data ?? []).map((r) => r.classificacao_nome).filter(Boolean));
+    return Array.from(nomes).sort();
+  }, [realizados.data]);
+
+  const realizadosFiltrados = useMemo(() => {
+    return (realizados.data ?? []).filter((r) => {
+      if (filtroTipo !== "TODOS" && r.tipo !== filtroTipo) return false;
+      if (filtroClassificacao !== "TODAS" && r.classificacao_nome !== filtroClassificacao) return false;
+      return true;
+    });
+  }, [realizados.data, filtroTipo, filtroClassificacao]);
+
+  const totalPago = realizadosFiltrados.reduce((t, r) => t + Number(r.valor), 0);
+
+  const excluir = useMutation({
+    mutationFn: (id: string) => api.deletarRealizado(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["realizados"] });
+      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      toast({ title: "Lançamento excluído" });
+      setExcluindo(null);
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao excluir", description: e.message }),
+  });
 
   const excluir = useMutation({
     mutationFn: (id: string) => api.deletarRealizado(id),
@@ -240,7 +268,37 @@ export default function Realizados() {
 
       <section className="cartao overflow-hidden">
         <div className="border-b border-outline-variant bg-surface p-stack-md">
-          <h2 className="text-headline-sm text-on-surface">Lançado em {formatarCompetencia(mes)}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-headline-sm text-on-surface">Lançado em {formatarCompetencia(mes)}</h2>
+            <div className="flex flex-wrap gap-1">
+              {(["TODOS", "RECEITA", "DESPESA"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFiltroTipo(t)}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-body-sm transition-colors",
+                    filtroTipo === t
+                      ? "bg-secondary-container font-semibold text-on-secondary-container"
+                      : "text-on-surface-variant hover:bg-surface-container-high",
+                  )}
+                >
+                  {t === "TODOS" ? "Todos" : t === "RECEITA" ? "Receitas" : "Despesas"}
+                </button>
+              ))}
+              {classificacoes.length > 0 && (
+                <select
+                  className="rounded border border-outline-variant bg-surface-container-low px-2 py-1 text-body-sm text-on-surface"
+                  value={filtroClassificacao}
+                  onChange={(e) => setFiltroClassificacao(e.target.value)}
+                >
+                  <option value="TODAS">Todas as classificações</option>
+                  {classificacoes.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
         </div>
         {(realizados.data ?? []).length === 0 ? (
           <Card className="border-0 shadow-none">
@@ -251,16 +309,28 @@ export default function Realizados() {
               </p>
             </CardContent>
           </Card>
+        ) : realizadosFiltrados.length === 0 ? (
+          <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
+            Nenhum lançamento com esse filtro.
+          </p>
         ) : (
           <div className="divide-y divide-outline-variant">
-            {(realizados.data ?? []).map((lancamento) => (
+            {realizadosFiltrados.map((lancamento) => (
               <div
                 key={lancamento.id}
                 className="group flex items-center justify-between gap-stack-md p-stack-md"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-on-surface">{lancamento.descricao}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-on-surface">{lancamento.descricao}</p>
+                    {lancamento.observacao && (
+                      <span title={lancamento.observacao} className="shrink-0 cursor-help text-on-surface-variant">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-body-sm text-on-surface-variant">
+                    {lancamento.classificacao_nome && `${lancamento.classificacao_nome} · `}
                     {lancamento.categoria_nome} · pago em {dataCurta(lancamento.data_pagamento)}
                     {lancamento.origem !== "MANUAL" && ` · ${lancamento.origem.toLowerCase()}`}
                   </p>

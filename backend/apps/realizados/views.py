@@ -45,6 +45,43 @@ class RealizadoViewSet(WorkspaceViewSet):
         )
         return Response(list(linhas))
 
+    @action(detail=False, methods=["get"], url_path="evolucao-categoria")
+    def evolucao_categoria(self, request):
+        """
+        Série histórica de despesas por categoria nos últimos N meses.
+
+        GET /realizados/evolucao-categoria/?meses=6
+        """
+        workspace = workspace_do_request(request)
+        meses = max(1, min(24, int(request.query_params.get("meses", 6))))
+
+        hoje = hoje_local()
+        fim = date(hoje.year, hoje.month, 1)
+        # retrocede (meses-1) meses para obter o início do intervalo
+        m = fim.month - (meses - 1)
+        y = fim.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        inicio = date(y, m, 1)
+
+        linhas = (
+            Realizado.objects.filter(
+                workspace=workspace,
+                competencia__gte=inicio,
+                competencia__lte=fim,
+                tipo="DESPESA",
+            )
+            .select_related("categoria", "categoria__classificacao")
+            .values(
+                competencia=models.F("competencia"),
+                categoria=models.F("categoria__nome"),
+            )
+            .annotate(total=Sum("valor"))
+            .order_by("competencia", "-total")
+        )
+        return Response(list(linhas))
+
     @action(detail=False, methods=["post"], url_path="baixar-parcela")
     def baixar_parcela(self, request):
         """Marca uma parcela prevista como paga, criando o realizado."""

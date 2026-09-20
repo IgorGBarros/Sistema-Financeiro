@@ -42,10 +42,12 @@ const FREQUENCIAS: { valor: Frequencia; rotulo: string }[] = [
 interface Props {
   aberto: boolean;
   contrato: Contrato | null;
+  /** Dados para pré-preencher o formulário como novo contrato (duplicação). */
+  dadosIniciais?: Partial<Contrato>;
   onFechar: () => void;
 }
 
-export function FormularioContrato({ aberto, contrato, onFechar }: Props) {
+export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }: Props) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -69,23 +71,24 @@ export function FormularioContrato({ aberto, contrato, onFechar }: Props) {
 
   useEffect(() => {
     if (!aberto) return;
-    if (contrato) {
+    const fonte = contrato ?? (dadosIniciais as Contrato | null);
+    if (fonte) {
       formulario.reset({
-        descricao: contrato.descricao,
-        tipo: contrato.tipo,
-        categoria: contrato.categoria,
-        estabelecimento: contrato.estabelecimento,
-        valor_unitario: Number(contrato.valor_unitario),
-        frequencia: contrato.frequencia,
-        data_inicio: contrato.data_inicio,
-        data_fim: contrato.data_fim,
-        reajuste_anual_pct: Number(contrato.reajuste_anual_pct),
+        descricao: fonte.descricao ?? "",
+        tipo: fonte.tipo ?? "DESPESA",
+        categoria: fonte.categoria ?? "",
+        estabelecimento: fonte.estabelecimento ?? "",
+        valor_unitario: Number(fonte.valor_unitario ?? 0),
+        frequencia: fonte.frequencia ?? "M",
+        data_inicio: fonte.data_inicio ?? "",
+        data_fim: fonte.data_fim ?? "",
+        reajuste_anual_pct: Number(fonte.reajuste_anual_pct ?? 0),
       });
     } else {
       formulario.reset();
     }
     setErroGeral(null);
-  }, [aberto, contrato]);
+  }, [aberto, contrato, dadosIniciais]);
 
   const categorias = useQuery({
     queryKey: ["categorias", tipo],

@@ -36,9 +36,15 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   const [modo, setModo] = useState<Modo>("camera");
   const [chaveDigitada, setChaveDigitada] = useState("");
   const [erroCamera, setErroCamera] = useState<string | null>(null);
+  // Incrementado em "Tentar de novo" para forçar o useEffect a re-executar
+  // mesmo quando `modo` já é "camera" (estado não mudaria).
+  const [tentativa, setTentativa] = useState(0);
   const online = useConexao();
   const leitorRef = useRef<Html5Qrcode | null>(null);
   const processandoRef = useRef(false);
+  // Evita que o .catch() de uma tentativa anterior (promise em voo) afete
+  // uma instância já fechada ou reaberta do scanner.
+  const ativoRef = useRef(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -65,8 +71,6 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
       fechar();
     },
     onError: (erro: ApiError, conteudo: string) => {
-      processandoRef.current = false;
-
       // Falha de rede (status 0) não pode custar o cupom: o papel vai para o
       // lixo na saída da loja. Guardamos e reenviamos quando a conexão voltar.
       // Erro do servidor (4xx/5xx) é outra história — reenviar não resolveria.
@@ -81,6 +85,11 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
         return;
       }
 
+      // Só agora libera o guard — depois de descartar o caminho offline.
+      // Liberar antes criaria uma janela onde a câmera ainda ativa poderia
+      // disparar um segundo scan enquanto o erro ainda está sendo tratado.
+      processandoRef.current = false;
+
       toast({
         variant: "destructive",
         title: "Não deu para cadastrar",
@@ -92,17 +101,23 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   async function pararCamera() {
     const leitor = leitorRef.current;
     if (!leitor) return;
+    leitorRef.current = null;
     try {
-      if (leitor.getState() === 2) await leitor.stop();
+      // Estado >= 2 cobre tanto SCANNING (2) quanto PAUSED (3); em ambos os
+      // casos o stream de hardware ainda está ativo e precisa de stop().
+      if (leitor.getState() >= 2) await leitor.stop();
       leitor.clear();
     } catch {
-      // câmera já liberada
+      // câmera já liberada ou elemento removido do DOM
     }
-    leitorRef.current = null;
   }
 
   function fechar() {
+    ativoRef.current = false;
     void pararCamera();
+    // Resetar modo garante que na próxima abertura (via prop aberto ou remount)
+    // o componente sempre inicie pelo caminho da câmera.
+    setModo("camera");
     setChaveDigitada("");
     setErroCamera(null);
     processandoRef.current = false;
@@ -115,10 +130,24 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
       return;
     }
 
-    const leitor = new Html5Qrcode(ID_LEITOR, {
-      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-      verbose: false,
-    });
+    ativoRef.current = true;
+    processandoRef.current = false;
+
+    // O construtor de Html5Qrcode chama document.getElementById(ID_LEITOR)
+    // de forma síncrona. Se o elemento não estiver no DOM neste momento
+    // (ex.: race condition com o portal do Dialog), capturamos o erro aqui
+    // em vez de deixar o effect crashar silenciosamente.
+    let leitor: Html5Qrcode;
+    try {
+      leitor = new Html5Qrcode(ID_LEITOR, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
+    } catch {
+      setErroCamera("Não foi possível inicializar o leitor de câmera neste aparelho. Digite a chave abaixo.");
+      setModo("digitar");
+      return;
+    }
     leitorRef.current = leitor;
 
     leitor
@@ -137,6 +166,9 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
         },
       )
       .catch((erro: Error) => {
+        // Ignora rejeições de instâncias antigas (dialog fechado/reaberto
+        // antes de .start() resolver) para não poluir uma sessão nova.
+        if (!ativoRef.current) return;
         setErroCamera(
           erro.name === "NotAllowedError"
             ? "Permita o acesso à câmera nas configurações do navegador para ler o cupom."
@@ -146,9 +178,12 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
       });
 
     return () => {
+      ativoRef.current = false;
       void pararCamera();
     };
-  }, [aberto, modo]);
+    // `tentativa` entra nas deps para que "Tentar de novo" force o effect a
+    // re-executar mesmo quando `modo` já é "camera" (nenhum estado muda).
+  }, [aberto, modo, tentativa]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chaveLimpa = chaveDigitada.replace(/\D/g, "");
   const chaveValida = validarChaveAcesso(chaveLimpa);
@@ -212,12 +247,19 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
             <div className="flex gap-2">
               <Button
                 className="flex-1"
-                disabled={!chaveValida}
+                disabled={!chaveValida || cadastrar.isPending}
                 onClick={() => cadastrar.mutate(chaveLimpa)}
               >
                 Cadastrar nota
               </Button>
-              <Button variant="outline" onClick={() => { setErroCamera(null); setModo("camera"); }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setErroCamera(null);
+                  cadastrar.reset();
+                  setModo("camera");
+                }}
+              >
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
@@ -225,7 +267,17 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
         )}
 
         {cadastrar.isError && !cadastrar.isPending && (
-          <Button variant="outline" className="w-full" onClick={() => setModo("camera")}>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              cadastrar.reset();
+              // Se o modo já for "camera", apenas incrementar `tentativa`
+              // força o useEffect a re-executar e reiniciar a câmera.
+              setModo("camera");
+              setTentativa((n) => n + 1);
+            }}
+          >
             <RotateCcw className="mr-2 h-4 w-4" />
             Tentar de novo
           </Button>

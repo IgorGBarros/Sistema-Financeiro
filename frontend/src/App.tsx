@@ -19,6 +19,7 @@ import Previsao from "@/features/previsao/Previsao";
 import FluxoCaixa from "@/features/fluxo/FluxoCaixa";
 import Folha from "@/features/folha/Folha";
 import IR from "@/features/ir/IR";
+import Turnaround from "@/features/turnaround/Turnaround";
 import { AppShell } from "@/shared/components/AppShell";
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/contratos/:id" element={<DetalheContrato />} />
         <Route path="/assistente" element={<Assistente />} />
         <Route path="/ir" element={<IR />} />
+        <Route path="/turnaround" element={<Turnaround />} />
         <Route
           path="*"
           element={

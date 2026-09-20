@@ -449,6 +449,49 @@ export interface DocumentoImportado {
 }
 
 // ---------------------------------------------------------------------------
+// Turnaround
+// ---------------------------------------------------------------------------
+
+export type StatusPlano = "RASCUNHO" | "ATIVO" | "CONCLUIDO" | "PAUSADO";
+export type TipoClassificacao = "ESSENCIAL" | "BOM" | "RUIM";
+
+export interface PlanoTurnaround {
+  id: string;
+  nome: string;
+  status: StatusPlano;
+  data_inicio: string;
+  meta_saldo: string | null;
+  meta_comprometimento_pct: string | null;
+  observacao: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface ClassificacaoContrato {
+  id: string;
+  plano: string;
+  contrato: string;
+  contrato_descricao: string;
+  contrato_valor: string;
+  contrato_tipo: TipoLancamento;
+  tipo: TipoClassificacao;
+  justificativa: string;
+  criado_em: string;
+}
+
+export interface DiagnosticoTurnaround {
+  renda_mensal_media: string;
+  despesa_mensal_media: string;
+  comprometimento_pct: string;
+  divida_total: string;
+  score_saude: number;
+  semaforo: "verde" | "amarelo" | "vermelho";
+  tem_plano_ativo: boolean;
+  projecao_3_meses: { competencia: string; receita: string; despesa: string; saldo: string }[];
+  regras: { comprometimento_meta: string; limite_vermelho: string; limite_amarelo: string };
+}
+
+// ---------------------------------------------------------------------------
 // Imposto de Renda
 // ---------------------------------------------------------------------------
 
@@ -1054,4 +1097,25 @@ export const api = {
     }),
   deletarIrOutraDedução: (id: string) =>
     request<void>(`/ir-outras-deducoes/${id}/`, { method: "DELETE" }),
+
+  // --- turnaround -----------------------------------------------------------
+  diagnosticoTurnaround: (saldoAtual = "0") =>
+    request<DiagnosticoTurnaround>(`/turnaround/diagnostico/?${qs({ saldo_atual: saldoAtual })}`),
+
+  planosTurnaround: () => lista<PlanoTurnaround>("/turnaround/planos/"),
+  salvarPlanoTurnaround: (dados: Partial<PlanoTurnaround>, id?: string) =>
+    request<PlanoTurnaround>(
+      id ? `/turnaround/planos/${id}/` : "/turnaround/planos/",
+      { method: id ? "PATCH" : "POST", body: JSON.stringify(dados) },
+    ),
+
+  classificacoesTurnaround: (planoId: string) =>
+    lista<ClassificacaoContrato>(`/turnaround/classificacoes/?plano=${planoId}`),
+  salvarClassificacao: (dados: Partial<ClassificacaoContrato>, id?: string) =>
+    request<ClassificacaoContrato>(
+      id ? `/turnaround/classificacoes/${id}/` : "/turnaround/classificacoes/",
+      { method: id ? "PATCH" : "POST", body: JSON.stringify(dados) },
+    ),
+  deletarClassificacao: (id: string) =>
+    request<void>(`/turnaround/classificacoes/${id}/`, { method: "DELETE" }),
 };

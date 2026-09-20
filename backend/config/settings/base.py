@@ -44,6 +44,7 @@ APPS_PROJETO = [
     "apps.previsao",
     "apps.assistente",
     "apps.ir",
+    "apps.turnaround",
 ]
 
 INSTALLED_APPS = APPS_DJANGO + APPS_TERCEIROS + APPS_PROJETO

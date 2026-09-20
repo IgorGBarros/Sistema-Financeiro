@@ -30,6 +30,7 @@ api = [
     path("", include("apps.previsao.urls")),
     path("", include("apps.assistente.urls")),
     path("", include("apps.ir.urls")),
+    path("", include("apps.turnaround.urls")),
     path("saude/", saude, name="saude"),
     path("auth/token/", TokenObtainPairView.as_view(), name="token-obtain"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, MessageSquarePlus, Send, Trash2, Wrench } from "lucide-react";
 
 import { api, ApiError } from "@/shared/lib/api";
+import { useToast } from "@/shared/ui/use-toast";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -38,6 +39,8 @@ export default function Assistente() {
     queryFn: () => api.conversas(),
   });
 
+  const { toast } = useToast();
+
   const deletarConversa = useMutation({
     mutationFn: (id: string) => api.deletarConversa(id),
     onSuccess: (_, id) => {
@@ -47,6 +50,8 @@ export default function Assistente() {
         setFalas([]);
       }
     },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao excluir conversa", description: e.message }),
   });
 
   useEffect(() => {

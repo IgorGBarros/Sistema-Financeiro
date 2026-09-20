@@ -215,10 +215,13 @@ export default function Cartoes() {
  * espalha erro por doze meses da projeção.
  */
 function ListaCompras() {
-  const compras = useQuery({ queryKey: ["compras"], queryFn: () => api.compras() });
+  const compras = useQuery({
+    queryKey: ["compras", { page_size: "50" }],
+    queryFn: () => api.compras({ page_size: "50" }),
+  });
   const lista = compras.data ?? [];
 
-  if (compras.isLoading || lista.length === 0) return null;
+  if (compras.isLoading) return null;
 
   return (
     <div className="cartao mb-container-padding overflow-hidden">
@@ -228,6 +231,11 @@ function ListaCompras() {
           Vêm do cupom escaneado. Cada parcela entra na fatura do mês dela.
         </p>
       </div>
+      {lista.length === 0 ? (
+        <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
+          Nenhuma compra registrada. Escaneie um cupom fiscal para registrar a primeira.
+        </p>
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
@@ -272,16 +280,20 @@ function ListaCompras() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
 
 /** Faturas importadas, com atalho para a tela de conciliação. */
 function ListaFaturas() {
-  const faturas = useQuery({ queryKey: ["faturas"], queryFn: () => api.faturas() });
+  const faturas = useQuery({
+    queryKey: ["faturas", { page_size: "50" }],
+    queryFn: () => api.faturas({ page_size: "50" }),
+  });
   const lista = faturas.data ?? [];
 
-  if (faturas.isLoading || lista.length === 0) return null;
+  if (faturas.isLoading) return null;
 
   return (
     <div className="cartao mb-container-padding overflow-hidden">
@@ -291,6 +303,11 @@ function ListaFaturas() {
           Abra para revisar as linhas que não casaram com uma compra registrada.
         </p>
       </div>
+      {lista.length === 0 ? (
+        <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
+          Nenhuma fatura importada. Use o formulário abaixo para enviar o PDF da fatura.
+        </p>
+      ) : (
       <div className="divide-y divide-outline-variant">
         {lista.map((fatura) => {
           const pendentes = fatura.lancamentos.filter(
@@ -325,6 +342,7 @@ function ListaFaturas() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

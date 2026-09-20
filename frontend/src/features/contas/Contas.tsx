@@ -205,7 +205,11 @@ export default function Contas() {
         descricao="Luz, água e gás — com consumo e tarifa, não só o valor."
       />
 
-      {historico.isLoading ? (
+      {historico.isError ? (
+        <p className="py-stack-lg text-center text-body-sm text-error">
+          Não foi possível carregar as contas. Verifique sua conexão e tente novamente.
+        </p>
+      ) : historico.isLoading ? (
         <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">
           Carregando…
         </p>

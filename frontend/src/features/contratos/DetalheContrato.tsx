@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronLeft, Clock } from "lucide-react";
@@ -24,9 +23,10 @@ const dataCurta = (iso: string) =>
 export default function DetalheContrato() {
   const { id } = useParams<{ id: string }>();
 
-  const contratosQ = useQuery({
-    queryKey: ["contratos", {}],
-    queryFn: () => api.contratos(),
+  const contratoQ = useQuery({
+    queryKey: ["contratos", id],
+    queryFn: () => api.contrato(id!),
+    enabled: Boolean(id),
   });
 
   const parcelasQ = useQuery({
@@ -35,10 +35,7 @@ export default function DetalheContrato() {
     enabled: Boolean(id),
   });
 
-  const contrato: Contrato | undefined = useMemo(
-    () => contratosQ.data?.find((c) => c.id === id),
-    [contratosQ.data, id],
-  );
+  const contrato: Contrato | undefined = contratoQ.data;
 
   const parcelas = parcelasQ.data ?? [];
   const pagas = parcelas.filter((p) => p.pago);
@@ -46,7 +43,7 @@ export default function DetalheContrato() {
   const valorPago = pagas.reduce((t, p) => t + Number(p.valor_previsto), 0);
   const valorFuturo = emAberto.reduce((t, p) => t + Number(p.valor_previsto), 0);
 
-  if (contratosQ.isLoading || parcelasQ.isLoading) {
+  if (contratoQ.isLoading || parcelasQ.isLoading) {
     return (
       <p className="p-container-padding text-center text-body-sm text-on-surface-variant">
         Carregando…

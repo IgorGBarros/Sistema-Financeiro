@@ -35,7 +35,11 @@ export default function Financiamento() {
         descricao="Parcelas vindas do demonstrativo do banco, com o valor exato de cada uma."
       />
 
-      {financiamentos.isLoading ? (
+      {financiamentos.isError ? (
+        <p className="py-stack-lg text-center text-body-sm text-error">
+          Não foi possível carregar os financiamentos. Verifique sua conexão e tente novamente.
+        </p>
+      ) : financiamentos.isLoading ? (
         <p className="py-stack-lg text-center text-body-sm text-on-surface-variant">
           Carregando…
         </p>

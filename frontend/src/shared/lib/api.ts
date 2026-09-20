@@ -323,6 +323,7 @@ export interface Compra {
   categoria: string;
   categoria_nome: string;
   descricao: string;
+  observacao: string;
   data_compra: string;
   valor_total: string;
   parcelas_total: number;
@@ -641,6 +642,7 @@ export const api = {
 
   contratos: (filtros: Record<string, string | undefined> = {}) =>
     lista<Contrato>(`/contratos/?${qs(filtros)}`),
+  contrato: (id: string) => request<Contrato>(`/contratos/${id}/`),
   salvarContrato: (dados: Partial<Contrato>, id?: string) =>
     request<Contrato>(id ? `/contratos/${id}/` : "/contratos/", {
       method: id ? "PATCH" : "POST",
@@ -777,7 +779,8 @@ export const api = {
     }),
 
   cartoes: () => lista<Cartao>("/cartoes/"),
-  compras: () => lista<Compra>("/compras/"),
+  compras: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Compra>(`/compras/?${qs(filtros)}`),
   unidadesConsumidoras: () =>
     lista<{
       id: string;
@@ -817,7 +820,8 @@ export const api = {
       `/financiamentos/${id}/parcelas/?${qs({ situacao })}`,
     ),
 
-  holerites: () => lista<Holerite>("/holerites/"),
+  holerites: (filtros: Record<string, string | undefined> = {}) =>
+    lista<Holerite>(`/holerites/?${qs(filtros)}`),
   confirmarHolerite: (id: string) =>
     request<Holerite>(`/holerites/${id}/confirmar/`, { method: "POST" }),
   integrarHolerite: (id: string, categoria: string, data_pagamento?: string) =>

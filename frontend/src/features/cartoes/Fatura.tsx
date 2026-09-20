@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronLeft, Clock, Link2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Check, ChevronLeft, Clock, Link2, Sparkles } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { api, type LancamentoFatura } from "@/shared/lib/api";
+import { useToast } from "@/shared/ui/use-toast";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Kpi } from "@/shared/components/Kpi";
@@ -35,6 +36,23 @@ const dataCurta = (iso: string | null) =>
 export default function Fatura() {
   const { id } = useParams<{ id: string }>();
   const [mostrarConciliados, setMostrarConciliados] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const autoConciliar = useMutation({
+    mutationFn: () => api.autoConciliarFatura(id!),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["fatura", id] });
+      toast({
+        title: `${res.conciliados} lançamento(s) conciliado(s)`,
+        description: res.pendentes_restantes > 0
+          ? `${res.pendentes_restantes} ainda sem correspondência.`
+          : "Tudo conciliado nesta fatura.",
+      });
+    },
+    onError: (e: Error) =>
+      toast({ variant: "destructive", title: "Erro ao conciliar", description: e.message }),
+  });
 
   const fatura = useQuery({
     queryKey: ["fatura", id],
@@ -89,6 +107,18 @@ export default function Fatura() {
       <CabecalhoPagina
         titulo={`${dados.cartao_apelido} — ${formatarCompetencia(dados.competencia)}`}
         descricao={`Vence em ${dataCurta(dados.data_vencimento)}. Confira as linhas que não casaram sozinhas.`}
+        acoes={
+          pendentes.length > 0 ? (
+            <Button
+              variant="outline"
+              onClick={() => autoConciliar.mutate()}
+              disabled={autoConciliar.isPending}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {autoConciliar.isPending ? "Conciliando…" : `Conciliar todos (${pendentes.length})`}
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">

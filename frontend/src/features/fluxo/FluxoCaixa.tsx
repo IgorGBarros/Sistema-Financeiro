@@ -2,12 +2,13 @@ import { Suspense, lazy, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { ScanLine, TrendingDown, TrendingUp } from "lucide-react";
+import { Download, ScanLine, TrendingDown, TrendingUp } from "lucide-react";
 
 import { api, type LinhaFluxo } from "@/shared/lib/api";
+import { exportarCsv } from "@/shared/lib/exportar";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 
 import { Button } from "@/shared/ui/button";
@@ -31,6 +32,11 @@ function somarMeses(data: Date, meses: number) {
 }
 const iso = (data: Date) => data.toISOString().slice(0, 10);
 
+const CORES_PIZZA = [
+  "#0058be", "#137333", "#7b2d9f", "#c05e00", "#006c7a",
+  "#8b3a3a", "#1a6b5a", "#4a4a00", "#5c3d6e", "#2d5a8e",
+];
+
 export default function FluxoCaixa() {
   const [horizonte, setHorizonte] = useState(12);
   const [scannerAberto, setScannerAberto] = useState(false);
@@ -38,6 +44,7 @@ export default function FluxoCaixa() {
   const hoje = new Date();
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const fim = somarMeses(inicio, horizonte - 1);
+  const mesCorrente = iso(inicio);
 
   const fluxo = useQuery({
     queryKey: ["fluxo-caixa", iso(inicio), iso(fim)],
@@ -48,6 +55,20 @@ export default function FluxoCaixa() {
     queryKey: ["mercado", "mes-corrente"],
     queryFn: () => api.mercadoMesCorrente(),
   });
+
+  const porCategoria = useQuery({
+    queryKey: ["despesas-categoria", mesCorrente],
+    queryFn: () => api.despesasPorCategoria(mesCorrente),
+  });
+
+  const dadosPizza = useMemo(
+    () =>
+      (porCategoria.data ?? [])
+        .filter((d) => d.tipo === "DESPESA")
+        .map((d) => ({ name: d.categoria, value: Number(d.total) }))
+        .slice(0, 10),
+    [porCategoria.data],
+  );
 
   const dados = useMemo(
     () =>
@@ -86,6 +107,28 @@ export default function FluxoCaixa() {
                 </button>
               ))}
             </div>
+            <Button
+              variant="outline"
+              onClick={() =>
+                exportarCsv(
+                  `fluxo-caixa-${horizonte}m`,
+                  (fluxo.data?.linhas ?? []).map((l) => ({
+                    competencia: l.competencia,
+                    receita_prevista: l.receita_prevista,
+                    receita_realizada: l.receita_realizada,
+                    despesa_prevista: l.despesa_prevista,
+                    despesa_realizada: l.despesa_realizada,
+                    resultado_previsto: l.resultado_previsto,
+                    resultado_realizado: l.resultado_realizado,
+                    saldo_acumulado: l.saldo_acumulado,
+                    projetado: String(l.projetado),
+                  })),
+                )
+              }
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Exportar CSV
+            </Button>
             <Button onClick={() => setScannerAberto(true)}>
               <ScanLine className="mr-2 h-4 w-4" />
               Ler cupom
@@ -170,6 +213,50 @@ export default function FluxoCaixa() {
           )}
         </CardContent>
       </Card>
+
+      {dadosPizza.length > 0 && (
+        <Card className="mt-container-padding">
+          <CardContent className="pt-6">
+            <h2 className="mb-4 text-headline-sm text-on-surface">
+              Despesas por categoria — {formatarCompetencia(mesCorrente)}
+            </h2>
+            <div className="flex flex-col items-center gap-6 md:flex-row">
+              <div className="h-[260px] w-full max-w-xs shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dadosPizza}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={110}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {dadosPizza.map((_, i) => (
+                        <Cell key={i} fill={CORES_PIZZA[i % CORES_PIZZA.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => formatarMoeda(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="flex-1 space-y-1.5">
+                {dadosPizza.map((item, i) => (
+                  <li key={item.name} className="flex items-center gap-2 text-body-sm">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm"
+                      style={{ background: CORES_PIZZA[i % CORES_PIZZA.length] }}
+                    />
+                    <span className="flex-1 text-on-surface">{item.name}</span>
+                    <span className="tabular text-on-surface-variant">{formatarMoeda(item.value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Suspense fallback={null}>
         {scannerAberto && (

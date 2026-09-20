@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import Aderencia from "@/features/relatorios/Aderencia";
+import Metas from "@/features/relatorios/Metas";
 import Assistente from "@/features/assistente/Assistente";
 import Cartoes from "@/features/cartoes/Cartoes";
 import Fatura from "@/features/cartoes/Fatura";
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/financiamento" element={<Financiamento />} />
         <Route path="/folha" element={<Folha />} />
         <Route path="/contas" element={<Contas />} />
+        <Route path="/aderencia" element={<Aderencia />} />
+        <Route path="/metas" element={<Metas />} />
         <Route path="/assistente" element={<Assistente />} />
         <Route
           path="*"

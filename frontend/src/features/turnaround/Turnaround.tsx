@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -509,6 +510,89 @@ function FormularioPlano({
 }
 
 // ---------------------------------------------------------------------------
+// Banner de início guiado
+// ---------------------------------------------------------------------------
+
+const ETAPAS = [
+  {
+    numero: 1,
+    titulo: "Diagnóstico",
+    descricao: "Veja o comprometimento da renda, a dívida total e a projeção dos próximos meses.",
+  },
+  {
+    numero: 2,
+    titulo: "Criar plano",
+    descricao: "Dê um nome ao plano, defina a data de início e a meta de comprometimento.",
+  },
+  {
+    numero: 3,
+    titulo: "Classificar contratos",
+    descricao: "Marque cada despesa como Essencial, Boa ou Ruim. Os Ruins são o alvo prioritário.",
+  },
+  {
+    numero: 4,
+    titulo: "Ativar e monitorar",
+    descricao: "Com o plano Ativo, o diagnóstico vira radar. Acompanhe até o comprometimento cair para a meta.",
+  },
+];
+
+function BannerRecuperacao({
+  projecaoNegativa,
+  onIniciar,
+}: {
+  projecaoNegativa: boolean;
+  onIniciar: () => void;
+}) {
+  return (
+    <div className="mb-container-padding rounded-xl border border-despesa/30 bg-red-50 p-container-padding dark:bg-red-950/20">
+      <div className="mb-stack-md flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-body-sm font-semibold uppercase tracking-wider text-despesa">
+            {projecaoNegativa ? "⚠ Projeção negativa detectada" : "Iniciar recuperação"}
+          </p>
+          <h2 className="mt-1 text-headline-md text-on-surface">
+            {projecaoNegativa
+              ? "Seu caixa fica negativo nos próximos meses"
+              : "Bem-vindo ao Turnaround Pessoal"}
+          </h2>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            {projecaoNegativa
+              ? "Hora de agir antes que o problema cresça. O turnaround é um plano estruturado de recuperação em 4 etapas."
+              : "Um plano estruturado para recuperar a previsibilidade financeira. Siga as etapas abaixo para começar."}
+          </p>
+        </div>
+        <Button onClick={onIniciar} className="shrink-0">
+          <Plus className="mr-2 h-4 w-4" />
+          Criar meu plano agora
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {ETAPAS.map((e, i) => (
+          <div key={e.numero} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-despesa/20 text-body-sm font-bold text-despesa">
+                {e.numero}
+              </div>
+              {i < ETAPAS.length - 1 && (
+                <div className="mt-1 hidden h-full w-px bg-despesa/20 lg:block" />
+              )}
+            </div>
+            <div className="pb-2">
+              <p className="text-body-sm font-semibold text-on-surface">{e.titulo}</p>
+              <p className="mt-0.5 text-[12px] text-on-surface-variant">{e.descricao}</p>
+              {i < ETAPAS.length - 1 && (
+                <ArrowRight className="mt-1 h-3.5 w-3.5 text-on-surface-variant/40 lg:hidden" />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Página principal
 // ---------------------------------------------------------------------------
 
@@ -540,6 +624,16 @@ export default function Turnaround() {
     queryKey: ["turnaround", "planos"],
     queryFn: () => api.planosTurnaround(),
   });
+
+  const diagnostico = useQuery({
+    queryKey: ["turnaround", "diagnostico", "0"],
+    queryFn: () => api.diagnosticoTurnaround("0"),
+    staleTime: 60_000,
+  });
+
+  const semPlano = !planos.isLoading && (planos.data?.length ?? 0) === 0;
+  const projecaoNegativa = diagnostico.data?.semaforo === "vermelho";
+  const mostrarBannerInicio = semPlano || (projecaoNegativa && !diagnostico.data?.tem_plano_ativo);
 
   const plano = planos.data?.find((p) => p.id === planoSelecionado)
     ?? planos.data?.find((p) => p.status === "ATIVO")
@@ -589,6 +683,13 @@ export default function Turnaround() {
           </Button>
         }
       />
+
+      {mostrarBannerInicio && !criandoPlano && (
+        <BannerRecuperacao
+          projecaoNegativa={projecaoNegativa}
+          onIniciar={() => setCriandoPlano(true)}
+        />
+      )}
 
       {criandoPlano && (
         <div className="mb-container-padding">
@@ -703,22 +804,6 @@ export default function Turnaround() {
             <span className="text-on-surface font-semibold">{plano.nome}</span>
           </p>
           <PainelClassificacao plano={plano} />
-        </div>
-      )}
-
-      {!planos.isLoading && (planos.data?.length ?? 0) === 0 && (
-        <div className="mt-container-padding cartao flex flex-col items-center gap-4 p-container-padding text-center">
-          <ClipboardList className="h-10 w-10 text-on-surface-variant" />
-          <div>
-            <p className="font-medium text-on-surface">Nenhum plano criado ainda</p>
-            <p className="text-body-sm text-on-surface-variant">
-              Crie um plano para começar a classificar seus contratos e definir metas de recuperação.
-            </p>
-          </div>
-          <Button onClick={() => setCriandoPlano(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Criar primeiro plano
-          </Button>
         </div>
       )}
 

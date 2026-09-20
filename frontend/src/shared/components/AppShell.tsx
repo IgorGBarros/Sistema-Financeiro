@@ -29,6 +29,7 @@ import {
 
 import { AlertasContratos } from "@/shared/components/AlertasContratos";
 import { AlertasVencimento } from "@/shared/components/AlertasVencimento";
+import { AlertaTurnaround } from "@/shared/components/AlertaTurnaround";
 import { BarraStatus } from "@/shared/components/BarraStatus";
 import { BuscaGlobal } from "@/shared/components/BuscaGlobal";
 import { cn } from "@/shared/lib/utils";
@@ -229,6 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <BarraStatus />
+        <AlertaTurnaround />
         <AlertasContratos />
         <AlertasVencimento />
 

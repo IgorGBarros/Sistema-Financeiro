@@ -180,7 +180,7 @@ export default function Previsao() {
                 </tr>
               </thead>
               <tbody className="text-body-sm">
-                {(dados.meses ?? []).slice(0, 3).map((mes) => {
+                {(dados?.meses ?? []).slice(0, 3).map((mes) => {
                   const saldo50 = Number(mes.saldo_p50);
                   const resultado = Number(mes.resultado_p50);
                   return (

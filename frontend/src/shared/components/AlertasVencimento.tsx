@@ -4,8 +4,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "@/shared/lib/api";
-import { formatarMoeda } from "@/features/fiscal/nfce";
-import { cn } from "@/shared/lib/utils";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const DIAS_ALERTA = 7;

@@ -5,7 +5,7 @@ import {
   Area, AreaChart, Bar, CartesianGrid, Cell, ComposedChart, Legend, Line,
   Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { ArrowDownRight, ArrowUpRight, Download, Minus, ScanLine, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Download, ScanLine, TrendingDown, TrendingUp } from "lucide-react";
 
 import { api, type LinhaFluxo } from "@/shared/lib/api";
 import { exportarCsv } from "@/shared/lib/exportar";

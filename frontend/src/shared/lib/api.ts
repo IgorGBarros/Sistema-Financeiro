@@ -1114,11 +1114,11 @@ export const api = {
 
   classificacoesTurnaround: (planoId: string) =>
     lista<ClassificacaoContrato>(`/turnaround/classificacoes/?plano=${planoId}`),
-  salvarClassificacao: (dados: Partial<ClassificacaoContrato>, id?: string) =>
+  salvarClassificacaoContrato: (dados: Partial<ClassificacaoContrato>, id?: string) =>
     request<ClassificacaoContrato>(
       id ? `/turnaround/classificacoes/${id}/` : "/turnaround/classificacoes/",
       { method: id ? "PATCH" : "POST", body: JSON.stringify(dados) },
     ),
-  deletarClassificacao: (id: string) =>
+  deletarClassificacaoContrato: (id: string) =>
     request<void>(`/turnaround/classificacoes/${id}/`, { method: "DELETE" }),
 };

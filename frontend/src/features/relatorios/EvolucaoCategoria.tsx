@@ -141,7 +141,7 @@ export default function EvolucaoCategoria() {
                 />
                 <Tooltip formatter={(v: number, nome) => [formatarMoeda(v), nome]} labelClassName="font-medium" />
                 <Legend />
-                {categoriasFiltradas.map((cat, i) => (
+                {categoriasFiltradas.map((cat) => (
                   <Line
                     key={cat}
                     type="monotone"

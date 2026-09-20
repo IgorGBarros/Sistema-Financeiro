@@ -355,6 +355,12 @@ export default function Contratos() {
         contrato={emRescisao}
         onFechar={() => { setRescindirAberto(false); setEmRescisao(null); }}
       />
+
+      <ModalRescindir
+        aberto={rescindirAberto}
+        contrato={emRescisao}
+        onFechar={() => { setRescindirAberto(false); setEmRescisao(null); }}
+      />
     </div>
   );
 }

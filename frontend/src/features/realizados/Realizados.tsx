@@ -89,6 +89,18 @@ export default function Realizados() {
       toast({ variant: "destructive", title: "Erro ao excluir", description: e.message }),
   });
 
+  const excluir = useMutation({
+    mutationFn: (id: string) => api.deletarRealizado(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["realizados"] });
+      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      toast({ title: "Lançamento excluído" });
+      setExcluindo(null);
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao excluir", description: e.message }),
+  });
+
   function mudarMes(passo: number) {
     const [ano, m] = mes.split("-").map(Number);
     setMes(iso(new Date(ano, m - 1 + passo, 1)));

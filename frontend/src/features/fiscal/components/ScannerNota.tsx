@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Camera, Keyboard, Loader2, RotateCcw, VideoOff } from "lucide-react";
+import { Camera, ImagePlus, Keyboard, Loader2, RotateCcw, VideoOff, X, Zap, ZapOff } from "lucide-react";
 
 import { api, ApiError, type NotaFiscal } from "@/shared/lib/api";
 import { extrairChave, validarChaveAcesso } from "@/features/fiscal/nfce";
@@ -9,15 +9,18 @@ import { enfileirar } from "@/features/fiscal/fila";
 import { useConexao } from "@/features/fiscal/hooks/useSincronizacao";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { useToast } from "@/shared/ui/use-toast";
 
-const ID_LEITOR = "leitor-qrcode";
+const ID_LEITOR = "scanner-nota-leitor";
+const ID_LEITOR_ARQUIVO = "scanner-nota-leitor-arquivo";
+
+// iOS/Safari não implementa getCapabilities() da câmera — várias
+// verificações de "o aparelho suporta isso?" retornam sempre vazio.
+// A flag garante que aplicamos os ajustes direto, sem checagem prévia.
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 type Modo = "camera" | "digitar";
-// Estado da câmera separado de `modo` para exibir o spinner enquanto o
-// navegador mostra o diálogo de permissão.
-type EstadoCamera = "solicitando" | "ativa" | "negada" | "erro";
+type EstadoCamera = "iniciando" | "ativa" | "negada" | "erro";
 
 interface Props {
   aberto: boolean;
@@ -26,36 +29,27 @@ interface Props {
 }
 
 /**
- * Leitura do cupom fiscal.
+ * Scanner de QR Code do cupom fiscal, renderizado como overlay full-screen.
  *
- * A câmera só extrai o texto do QR. Todo o resto — validar a chave, consultar
- * a SEFAZ e gravar — acontece no backend: o portal da SEFAZ não envia
- * cabeçalhos CORS, então o navegador não consegue ler a página de jeito nenhum.
+ * Renderizar diretamente no DOM (sem portal de Dialog) garante que
+ * div#ID_LEITOR já existe quando o useEffect roda — sem race condition.
  *
- * Quando a câmera não coopera (cupom amassado, pouca luz), o campo de digitação
- * aceita os 44 dígitos impressos abaixo do QR.
+ * A câmera só extrai o texto do QR. Todo o resto (SEFAZ, gravação) é
+ * feito no backend: o portal da SEFAZ não envia cabeçalhos CORS.
  */
 export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   const [modo, setModo] = useState<Modo>("camera");
-  const [estadoCamera, setEstadoCamera] = useState<EstadoCamera>("solicitando");
+  const [estadoCamera, setEstadoCamera] = useState<EstadoCamera>("iniciando");
   const [chaveDigitada, setChaveDigitada] = useState("");
   const [erroCamera, setErroCamera] = useState<string | null>(null);
-  // Incrementado em "Tentar de novo" para forçar o useEffect a re-executar
-  // mesmo quando `modo` já é "camera" (estado não mudaria).
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
   const [tentativa, setTentativa] = useState(0);
-  // O Dialog do Radix usa portal — o div#leitor-qrcode só existe no DOM depois
-  // que o portal é inserido, que pode ser depois do primeiro useEffect.
-  // O useCallback ref notifica o effect exatamente quando o elemento está pronto.
-  const [divPronta, setDivPronta] = useState(false);
-  const refContainer = useCallback((node: HTMLDivElement | null) => {
-    setDivPronta(node !== null);
-  }, []);
 
   const online = useConexao();
-  const leitorRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const processandoRef = useRef(false);
-  // Evita que callbacks de tentativas anteriores (promise em voo) afetem
-  // uma instância já fechada ou reaberta do scanner.
   const ativoRef = useRef(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -71,7 +65,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
         toast({
           title: "Nota cadastrada sem os itens",
           description:
-            "A SEFAZ não respondeu agora. A chave está salva — use 'Buscar de novo' mais tarde para trazer os produtos.",
+            "A SEFAZ não respondeu agora. A chave está salva — use 'Buscar de novo' mais tarde.",
         });
       } else {
         toast({
@@ -83,23 +77,16 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
       fechar();
     },
     onError: (erro: ApiError, conteudo: string) => {
-      // Falha de rede (status 0) não pode custar o cupom: o papel vai para o
-      // lixo na saída da loja. Guardamos e reenviamos quando a conexão voltar.
-      // Erro do servidor (4xx/5xx) é outra história — reenviar não resolveria.
       const chave = extrairChave(conteudo);
       if (erro.offline && chave && enfileirar(conteudo, chave)) {
         toast({
           title: "Cupom guardado",
-          description:
-            "Sem conexão agora. Ele é enviado sozinho assim que a internet voltar.",
+          description: "Sem conexão. Ele é enviado assim que a internet voltar.",
         });
         fechar();
         return;
       }
-
-      // Só agora libera o guard — depois de descartar o caminho offline.
       processandoRef.current = false;
-
       toast({
         variant: "destructive",
         title: "Não deu para cadastrar",
@@ -109,16 +96,14 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   });
 
   async function pararCamera() {
-    const leitor = leitorRef.current;
-    if (!leitor) return;
-    leitorRef.current = null;
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    scannerRef.current = null;
     try {
-      // Estado >= 2 cobre tanto SCANNING (2) quanto PAUSED (3); em ambos os
-      // casos o stream de hardware ainda está ativo e precisa de stop().
-      if (leitor.getState() >= 2) await leitor.stop();
-      leitor.clear();
+      if (scanner.isScanning) await scanner.stop();
+      scanner.clear();
     } catch {
-      // câmera já liberada ou elemento removido do DOM
+      // câmera já liberada
     }
   }
 
@@ -126,84 +111,117 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
     ativoRef.current = false;
     void pararCamera();
     setModo("camera");
-    setEstadoCamera("solicitando");
+    setEstadoCamera("iniciando");
     setChaveDigitada("");
     setErroCamera(null);
-    setDivPronta(false);
+    setTorchOn(false);
+    setHasTorch(false);
     processandoRef.current = false;
     onFechar();
   }
 
   useEffect(() => {
-    if (!aberto || modo !== "camera" || !divPronta) {
+    if (!aberto || modo !== "camera") {
       void pararCamera();
       return;
     }
 
     ativoRef.current = true;
     processandoRef.current = false;
-    setEstadoCamera("solicitando");
+    setEstadoCamera("iniciando");
+    setTorchOn(false);
+    setHasTorch(false);
 
-    // Solicitar permissão explicitamente antes de criar o Html5Qrcode.
-    // getUserMedia exibe o diálogo "Permitir câmera?" do navegador e permite
-    // que a UI mostre o spinner enquanto o usuário decide. O stream é liberado
-    // imediatamente — o Html5Qrcode cria o próprio stream ao chamar .start().
-    // Isso também garante que o elemento #leitor-qrcode já existe no DOM
-    // (divPronta=true) antes de qualquer chamada a getElementById.
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
-        stream.getTracks().forEach((t) => t.stop());
+    // Delay antes de iniciar: dá tempo ao React de inserir o div no DOM
+    // antes de Html5Qrcode chamar getElementById (mesmo padrão do código
+    // de referência enviado pelo usuário, que usava 100ms no Android e
+    // 200ms no iOS).
+    const delay = isIOS ? 200 : 100;
+    const timer = setTimeout(async () => {
+      if (!ativoRef.current) return;
+
+      let scanner: Html5Qrcode;
+      try {
+        scanner = new Html5Qrcode(ID_LEITOR, {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
+      } catch {
+        if (!ativoRef.current) return;
+        setErroCamera("Não foi possível inicializar o leitor. Digite a chave abaixo.");
+        setEstadoCamera("erro");
+        setModo("digitar");
+        return;
+      }
+      scannerRef.current = scanner;
+
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: isIOS ? 12 : 15,
+            qrbox: isIOS ? { width: 240, height: 240 } : { width: 260, height: 260 },
+            aspectRatio: 1.0,
+          },
+          (texto) => {
+            if (!ativoRef.current || processandoRef.current) return;
+            processandoRef.current = true;
+            void pararCamera();
+            cadastrar.mutate(texto);
+          },
+          () => {
+            // silencia os "não encontrei QR neste frame"
+          },
+        );
 
         if (!ativoRef.current) return;
-
-        let leitor: Html5Qrcode;
-        try {
-          leitor = new Html5Qrcode(ID_LEITOR, {
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-            verbose: false,
-          });
-        } catch {
-          if (!ativoRef.current) return;
-          setErroCamera("Não foi possível inicializar o leitor. Digite a chave abaixo.");
-          setEstadoCamera("erro");
-          setModo("digitar");
-          return;
-        }
-        leitorRef.current = leitor;
         setEstadoCamera("ativa");
 
-        leitor
-          .start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
-            (texto) => {
-              if (processandoRef.current) return;
-              processandoRef.current = true;
-              void pararCamera();
-              cadastrar.mutate(texto);
-            },
-            () => {
-              // silencia os "não encontrei QR neste frame"
-            },
-          )
-          .catch((erro: Error) => {
-            if (!ativoRef.current) return;
-            setErroCamera(
-              "Não foi possível abrir a câmera neste aparelho. Digite a chave abaixo.",
-            );
-            setEstadoCamera("erro");
-            setModo("digitar");
-          });
-      })
-      .catch((erro: Error) => {
+        // Ajustes de câmera após o start() — delay porque o stream
+        // ainda está estabilizando (mesmo padrão do código de referência:
+        // 500ms Android / 1000ms iOS).
+        const ajusteDelay = isIOS ? 1000 : 500;
+        setTimeout(async () => {
+          if (!ativoRef.current) return;
+
+          // Foco contínuo — tenta direto sem checagem prévia.
+          try {
+            await scanner.applyVideoConstraints({
+              advanced: [{ focusMode: "continuous" }],
+            } as MediaTrackConstraints);
+          } catch {
+            // não suportado neste aparelho
+          }
+
+          // Torch — tenta ligar direto, SEM checar capabilities antes.
+          // No iOS, getCapabilities() retorna vazio mesmo com flash real;
+          // tentar direto e observar se funcionou é a única forma confiável.
+          try {
+            await scanner.applyVideoConstraints({
+              advanced: [{ torch: true }],
+            } as MediaTrackConstraints);
+            setTorchOn(true);
+            setHasTorch(true);
+          } catch {
+            setHasTorch(false);
+          }
+        }, ajusteDelay);
+
+      } catch (err: unknown) {
         if (!ativoRef.current) return;
-        if (erro.name === "NotAllowedError" || erro.name === "PermissionDeniedError") {
-          // Permissão negada: não muda para "digitar" automaticamente — o usuário
-          // pode desbloquear nas configurações do navegador e tentar de novo.
+        const name = err instanceof Error ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
           setEstadoCamera("negada");
-        } else if (erro.name === "NotFoundError") {
+        } else if (name === "NotFoundError") {
           setErroCamera("Nenhuma câmera encontrada neste aparelho. Digite a chave abaixo.");
+          setEstadoCamera("erro");
+          setModo("digitar");
+        } else if (name === "NotReadableError") {
+          setErroCamera(
+            isIOS
+              ? "Câmera ocupada por outro aplicativo. Digite a chave abaixo."
+              : "Câmera não disponível. Digite a chave abaixo.",
+          );
           setEstadoCamera("erro");
           setModo("digitar");
         } else {
@@ -211,114 +229,197 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           setEstadoCamera("erro");
           setModo("digitar");
         }
-      });
+      }
+    }, delay);
 
     return () => {
       ativoRef.current = false;
+      clearTimeout(timer);
       void pararCamera();
     };
-    // `tentativa` força re-execução quando modo já é "camera".
-    // `divPronta` garante que o portal do Dialog já inseriu o elemento no DOM.
-  }, [aberto, modo, tentativa, divPronta]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aberto, modo, tentativa]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleTorch() {
+    if (!scannerRef.current || !hasTorch) return;
+    try {
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ torch: !torchOn }],
+      } as MediaTrackConstraints);
+      setTorchOn((v) => !v);
+    } catch {
+      // flash não controlável
+    }
+  }
+
+  async function handleArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    try {
+      setErroCamera(null);
+      const leitorArquivo = new Html5Qrcode(ID_LEITOR_ARQUIVO);
+      const texto = await leitorArquivo.scanFile(arquivo, true);
+      cadastrar.mutate(texto);
+    } catch {
+      setErroCamera("QR Code não identificado na imagem. Tente uma foto mais nítida e de frente.");
+    } finally {
+      // Limpa o input para permitir reenvio do mesmo arquivo
+      if (e.target) e.target.value = "";
+    }
+  }
 
   const chaveLimpa = chaveDigitada.replace(/\D/g, "");
   const chaveValida = validarChaveAcesso(chaveLimpa);
 
-  return (
-    <Dialog open={aberto} onOpenChange={(v) => !v && fechar()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Ler cupom fiscal</DialogTitle>
-        </DialogHeader>
+  if (!aberto) return null;
 
+  return (
+    // Overlay full-screen renderizado direto no DOM — sem portal do
+    // Dialog. Isso garante que div#ID_LEITOR já existe quando o useEffect
+    // chama Html5Qrcode(ID_LEITOR), eliminando o race condition.
+    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between bg-zinc-900 px-4 py-3">
+        <h2 className="text-sm font-semibold">Ler cupom fiscal</h2>
+        <div className="flex items-center gap-2">
+          {hasTorch && (
+            <button
+              onClick={toggleTorch}
+              className={`rounded-full p-2 transition-colors ${
+                torchOn ? "bg-yellow-400 text-black" : "bg-zinc-700 text-white"
+              }`}
+              aria-label={torchOn ? "Desligar lanterna" : "Ligar lanterna"}
+            >
+              {torchOn ? <ZapOff size={18} /> : <Zap size={18} />}
+            </button>
+          )}
+          {modo === "camera" && estadoCamera !== "negada" && (
+            <button
+              onClick={() => setModo("digitar")}
+              className="rounded-full bg-zinc-700 p-2 text-white"
+              aria-label="Digitar a chave"
+            >
+              <Keyboard size={18} />
+            </button>
+          )}
+          <button
+            onClick={fechar}
+            className="rounded-full bg-zinc-700 p-2 text-white"
+            aria-label="Fechar scanner"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Corpo */}
+      <div className="flex flex-1 flex-col overflow-hidden">
         {cadastrar.isPending ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Consultando a nota na SEFAZ-BA…
-            </p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-zinc-400" />
+            <p className="text-sm text-zinc-400">Consultando a nota na SEFAZ-BA…</p>
           </div>
         ) : modo === "camera" ? (
-          <div className="space-y-3">
-            {/* O div do leitor fica sempre no DOM enquanto modo === "camera".
-                refContainer notifica o effect quando o portal já inseriu o
-                elemento, evitando o race condition com getElementById. */}
-            <div
-              id={ID_LEITOR}
-              ref={refContainer}
-              className="relative overflow-hidden rounded-lg border bg-muted aspect-square"
-            >
-              {estadoCamera === "solicitando" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Aguardando permissão da câmera…
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Se o navegador perguntar, clique em <strong>Permitir</strong>.
-                  </p>
-                </div>
-              )}
-              {estadoCamera === "negada" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-                  <VideoOff className="h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm font-medium">Câmera bloqueada</p>
-                  <p className="text-xs text-muted-foreground">
-                    Clique no ícone de câmera na barra de endereço e escolha{" "}
-                    <strong>Permitir</strong>, depois tente novamente.
-                  </p>
-                </div>
-              )}
-            </div>
+          <div className="relative flex flex-1 flex-col">
+            {/* O div deve existir sempre no DOM enquanto modo === "camera",
+                independente do estadoCamera — Html5Qrcode precisa dele. */}
+            <div id={ID_LEITOR} className="flex-1 bg-black" />
 
-            <p className="text-sm text-muted-foreground">
-              {online
-                ? "Aponte para o QR Code impresso no rodapé do cupom."
-                : "Sem conexão: os cupons ficam guardados e são enviados quando a internet voltar."}
-            </p>
+            {/* Mira */}
+            {(estadoCamera === "iniciando" || estadoCamera === "ativa") && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="relative aspect-square w-[65%] rounded-xl border-2 border-red-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
+                  <div className="absolute top-1/2 h-0.5 w-full -translate-y-1/2 animate-pulse bg-red-500 shadow-[0_0_8px_red]" />
+                  <div className="absolute left-0 top-0 h-5 w-5 rounded-tl-sm border-l-2 border-t-2 border-white" />
+                  <div className="absolute right-0 top-0 h-5 w-5 rounded-tr-sm border-r-2 border-t-2 border-white" />
+                  <div className="absolute bottom-0 left-0 h-5 w-5 rounded-bl-sm border-b-2 border-l-2 border-white" />
+                  <div className="absolute bottom-0 right-0 h-5 w-5 rounded-br-sm border-b-2 border-r-2 border-white" />
+                </div>
+              </div>
+            )}
 
-            {estadoCamera === "negada" ? (
-              <Button
-                className="w-full"
-                onClick={() => {
-                  cadastrar.reset();
-                  setEstadoCamera("solicitando");
-                  setTentativa((n) => n + 1);
-                }}
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Tentar novamente
-              </Button>
-            ) : (
-              <Button variant="ghost" className="w-full" onClick={() => setModo("digitar")}>
-                <Keyboard className="mr-2 h-4 w-4" />
-                Digitar a chave
-              </Button>
+            {/* Overlay de estado */}
+            {estadoCamera === "iniciando" && (
+              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
+                <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-xs text-zinc-300 backdrop-blur-sm">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {isIOS ? "Iniciando câmera…" : "Abrindo câmera…"}
+                </div>
+              </div>
+            )}
+
+            {estadoCamera === "ativa" && !erroCamera && (
+              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
+                <div className="flex items-center gap-2 rounded-full bg-emerald-700/80 px-4 py-2 text-xs text-white backdrop-blur-sm">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
+                  {isIOS ? "Aproxime devagar para focar" : "Aponte para o QR Code"}
+                </div>
+              </div>
+            )}
+
+            {estadoCamera === "negada" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center">
+                <VideoOff className="h-12 w-12 text-zinc-500" />
+                <p className="font-semibold">Câmera bloqueada</p>
+                <p className="text-sm text-zinc-400">
+                  Clique no ícone de câmera na barra de endereço e escolha{" "}
+                  <strong className="text-white">Permitir</strong>, depois tente novamente.
+                </p>
+                <Button
+                  className="mt-2"
+                  onClick={() => {
+                    setEstadoCamera("iniciando");
+                    setTentativa((n) => n + 1);
+                  }}
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Tentar novamente
+                </Button>
+                <button
+                  onClick={() => setModo("digitar")}
+                  className="text-sm text-zinc-400 underline underline-offset-2"
+                >
+                  Digitar a chave manualmente
+                </button>
+              </div>
+            )}
+
+            {erroCamera && estadoCamera !== "negada" && (
+              <div className="pointer-events-none absolute inset-x-4 bottom-20 rounded-lg bg-red-700/90 px-4 py-3 text-center text-sm font-medium backdrop-blur-sm">
+                {erroCamera}
+              </div>
+            )}
+
+            {!online && (
+              <div className="pointer-events-none absolute inset-x-4 top-14 rounded-lg bg-amber-700/80 px-4 py-2 text-center text-xs backdrop-blur-sm">
+                Sem conexão — o cupom será guardado e enviado quando a internet voltar.
+              </div>
             )}
           </div>
         ) : (
-          <div className="space-y-3">
+          /* Modo digitar */
+          <div className="flex flex-1 flex-col gap-4 bg-zinc-950 p-5">
             {erroCamera && (
-              <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="rounded-lg bg-red-700/30 p-3 text-sm text-red-300">
                 {erroCamera}
               </p>
             )}
-            <label className="block text-sm font-medium" htmlFor="chave">
+            <label className="text-sm font-medium text-zinc-300" htmlFor="chave-acesso">
               Chave de acesso
             </label>
             <Input
-              id="chave"
+              id="chave-acesso"
               inputMode="numeric"
               autoComplete="off"
               placeholder="44 dígitos impressos abaixo do QR Code"
               value={chaveDigitada}
               onChange={(e) => setChaveDigitada(e.target.value)}
+              className="bg-zinc-800 text-white placeholder:text-zinc-500 border-zinc-700"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-zinc-500">
               {chaveLimpa.length}/44 dígitos
               {chaveLimpa.length === 44 && !chaveValida && (
-                <span className="ml-2 text-destructive">
-                  Confira os números: o dígito verificador não bate.
+                <span className="ml-2 text-red-400">
+                  Dígito verificador não bate — confira os números.
                 </span>
               )}
             </p>
@@ -328,39 +429,69 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
                 disabled={!chaveValida || cadastrar.isPending}
                 onClick={() => cadastrar.mutate(chaveLimpa)}
               >
+                {cadastrar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Cadastrar nota
               </Button>
               <Button
                 variant="outline"
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
                 onClick={() => {
                   setErroCamera(null);
                   cadastrar.reset();
-                  setEstadoCamera("solicitando");
+                  setEstadoCamera("iniciando");
                   setModo("camera");
                 }}
               >
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
+
+            {cadastrar.isError && !cadastrar.isPending && (
+              <Button
+                variant="outline"
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                onClick={() => {
+                  cadastrar.reset();
+                  setEstadoCamera("iniciando");
+                  setModo("camera");
+                  setTentativa((n) => n + 1);
+                }}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Tentar de novo com a câmera
+              </Button>
+            )}
           </div>
         )}
+      </div>
 
-        {cadastrar.isError && !cadastrar.isPending && (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              cadastrar.reset();
-              setEstadoCamera("solicitando");
-              setModo("camera");
-              setTentativa((n) => n + 1);
-            }}
+      {/* Rodapé — foto como alternativa */}
+      {modo === "camera" && estadoCamera !== "negada" && !cadastrar.isPending && (
+        <div className="bg-zinc-900 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-700 py-3 text-sm font-semibold text-white transition-all active:scale-95"
           >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Tentar de novo
-          </Button>
-        )}
-      </DialogContent>
-    </Dialog>
+            <ImagePlus size={18} />
+            Enviar foto do cupom
+          </button>
+          <p className="mt-2 text-center text-[11px] text-zinc-500">
+            {isIOS ? "📱 Otimizado para iPhone" : "Útil quando a câmera ao vivo não foca bem"}
+          </p>
+        </div>
+      )}
+
+      {/* Inputs ocultos */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleArquivo}
+        className="hidden"
+      />
+      {/* Contêiner oculto usado pelo Html5Qrcode.scanFile() */}
+      <div id={ID_LEITOR_ARQUIVO} className="hidden" />
+    </div>
   );
 }

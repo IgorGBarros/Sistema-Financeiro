@@ -188,7 +188,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           try {
             await scanner.applyVideoConstraints({
               advanced: [{ focusMode: "continuous" }],
-            } as MediaTrackConstraints);
+            } as unknown as MediaTrackConstraints);
           } catch {
             // não suportado neste aparelho
           }
@@ -199,7 +199,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           try {
             await scanner.applyVideoConstraints({
               advanced: [{ torch: true }],
-            } as MediaTrackConstraints);
+            } as unknown as MediaTrackConstraints);
             setTorchOn(true);
             setHasTorch(true);
           } catch {
@@ -244,7 +244,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
     try {
       await scannerRef.current.applyVideoConstraints({
         advanced: [{ torch: !torchOn }],
-      } as MediaTrackConstraints);
+      } as unknown as MediaTrackConstraints);
       setTorchOn((v) => !v);
     } catch {
       // flash não controlável

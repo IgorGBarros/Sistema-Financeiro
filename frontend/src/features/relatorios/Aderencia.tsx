@@ -37,7 +37,7 @@ export default function Aderencia() {
     queryFn: () => api.aderencia(mes),
   });
 
-  const linhas: LinhaAderencia[] = (aderencia.data?.linhas ?? []) as LinhaAderencia[];
+  const linhas = (aderencia.data?.linhas ?? []) as unknown as LinhaAderencia[];
 
   const totais = linhas.reduce(
     (acc, l) => ({

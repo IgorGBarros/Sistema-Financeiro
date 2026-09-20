@@ -238,7 +238,7 @@ function LinhaContrato({
 
   const salvar = useMutation({
     mutationFn: (tipo: TipoClassificacao) =>
-      api.salvarClassificacao(
+      api.salvarClassificacaoContrato(
         { plano: planoId, contrato: contrato.id, tipo, justificativa },
         classificacao?.id,
       ),
@@ -251,7 +251,7 @@ function LinhaContrato({
   });
 
   const remover = useMutation({
-    mutationFn: () => api.deletarClassificacao(classificacao!.id),
+    mutationFn: () => api.deletarClassificacaoContrato(classificacao!.id),
     onSuccess: () => {
       onSalvo();
       toast({ title: "Classificação removida" });

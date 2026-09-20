@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { api, ApiError, type DeclaracaoIR, type ResultadoCalculo } from "@/shared/lib/api";
+import { api, ApiError, type ResultadoCalculo } from "@/shared/lib/api";
 import { formatarMoeda } from "@/features/fiscal/nfce";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Kpi } from "@/shared/components/Kpi";
@@ -148,7 +148,7 @@ function PainelResultado({ resultado }: { resultado: ResultadoCalculo }) {
       <div className={`rounded-xl border-2 p-4 text-center ${s.cor.includes("receita") ? "border-receita/30 bg-surface-container-low" : s.cor.includes("despesa") ? "border-despesa/30 bg-surface-container-low" : "border-outline-variant"}`}>
         <p className="text-sm text-on-surface-variant">Resultado da declaração</p>
         <p className={`mt-1 text-2xl font-bold tabular ${s.cor}`}>{s.texto}</p>
-        {resultado.irrf_a_creditar > 0 && (
+        {Number(resultado.irrf_a_creditar) > 0 && (
           <p className="mt-1 text-sm text-on-surface-variant">
             IRRF retido na fonte: {moeda(resultado.irrf_a_creditar)} (já deduzido)
           </p>
@@ -839,7 +839,7 @@ function ModalCriarDeclaracao({
 
   const form = useForm({
     resolver: zodResolver(esquemaCriar),
-    defaultValues: { ano: anoAtual - 1, modalidade: "INDIVIDUAL" as const, nome_titular: "", nome_conjuge: "" },
+    defaultValues: { ano: anoAtual - 1, modalidade: "INDIVIDUAL" as "INDIVIDUAL" | "CONJUNTA", nome_titular: "", nome_conjuge: "" },
   });
 
   const modalidade = form.watch("modalidade");
@@ -947,7 +947,7 @@ export default function IR() {
       <CabecalhoPagina
         titulo="Imposto de Renda"
         descricao="Estime seu IR, gerencie deduções e compare declaração individual com conjunta."
-        acao={
+        acoes={
           <Button size="sm" onClick={() => setCriando(true)}>
             <FilePlus className="mr-1.5 h-4 w-4" />
             Nova declaração

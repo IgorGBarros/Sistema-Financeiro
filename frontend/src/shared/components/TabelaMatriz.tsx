@@ -32,6 +32,8 @@ interface Props {
   /** Pinta valor negativo de vermelho e positivo de verde. */
   colorirSinal?: boolean;
   vazio?: React.ReactNode;
+  /** Callback disparado ao clicar em uma linha; recebe o id da linha. */
+  aoClicarLinha?: (id: string) => void;
 }
 
 const rotuloMes = (iso: string) => {
@@ -74,6 +76,7 @@ export function TabelaMatriz({
   rotuloPrimeiraColuna = "Nome",
   colorirSinal = true,
   vazio,
+  aoClicarLinha,
 }: Props) {
   const larguraFixa = useMemo(
     () => 224 + colunasAntes.length * 88,
@@ -130,9 +133,11 @@ export function TabelaMatriz({
           {linhas.map((linha) => (
             <tr
               key={linha.id}
+              onClick={aoClicarLinha ? () => aoClicarLinha(linha.id) : undefined}
               className={cn(
                 "h-[36px] border-b border-outline-variant transition-colors hover:bg-surface-container-low",
                 linha.destaque && "font-semibold",
+                aoClicarLinha && "cursor-pointer",
               )}
             >
               <td

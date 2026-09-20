@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { Trash2 } from "lucide-react";
 
 import { api, ApiError, type Cartao } from "@/shared/lib/api";
 import { Button } from "@/shared/ui/button";
@@ -50,6 +51,7 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   const formulario = useForm<Formulario>({
     resolver: zodResolver(esquema),
@@ -67,6 +69,7 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
   useEffect(() => {
     if (!aberto) return;
     setErroGeral(null);
+    setConfirmarExclusao(false);
     if (cartao) {
       formulario.reset({
         apelido: cartao.apelido,
@@ -90,6 +93,17 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cartoes"] });
       toast({ title: "Cartão desativado" });
+      onFechar();
+    },
+    onError: (erro: ApiError) => setErroGeral(erro.message),
+  });
+
+  const excluir = useMutation({
+    mutationFn: () => api.deletarCartao(cartao!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cartoes"] });
+      queryClient.invalidateQueries({ queryKey: ["cartoes", "painel"] });
+      toast({ title: "Cartão excluído", description: "As compras e faturas associadas foram removidas." });
       onFechar();
     },
     onError: (erro: ApiError) => setErroGeral(erro.message),
@@ -210,23 +224,64 @@ export function FormularioCartao({ aberto, cartao, onFechar }: Props) {
             </p>
           )}
 
+          {confirmarExclusao && (
+            <div className="rounded-md border border-error/40 bg-error-container p-stack-sm text-body-sm text-on-error-container">
+              <p className="font-medium">Excluir permanentemente?</p>
+              <p className="mt-0.5 text-[12px]">
+                Remove o cartão e todas as compras e faturas vinculadas. Essa ação não pode ser desfeita.
+              </p>
+              <div className="mt-stack-sm flex gap-stack-sm">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-on-error-container"
+                  onClick={() => setConfirmarExclusao(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-error text-on-error hover:bg-error/90"
+                  disabled={excluir.isPending}
+                  onClick={() => excluir.mutate()}
+                >
+                  {excluir.isPending ? "Excluindo…" : "Confirmar exclusão"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-2">
             {cartao ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-error hover:bg-error-container hover:text-on-error-container"
-                disabled={salvar.isPending}
-                onClick={() => desativar.mutate()}
-              >
-                Desativar cartão
-              </Button>
+              <div className="flex gap-stack-sm">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-error hover:bg-error-container hover:text-on-error-container"
+                  disabled={salvar.isPending || excluir.isPending}
+                  onClick={() => desativar.mutate()}
+                >
+                  Desativar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-error hover:bg-error-container hover:text-on-error-container"
+                  disabled={salvar.isPending || excluir.isPending}
+                  onClick={() => setConfirmarExclusao(true)}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Excluir
+                </Button>
+              </div>
             ) : <span />}
             <div className="flex gap-stack-sm">
               <Button type="button" variant="ghost" onClick={onFechar}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={salvar.isPending}>
+              <Button type="submit" disabled={salvar.isPending || excluir.isPending}>
                 {salvar.isPending ? "Salvando…" : "Salvar"}
               </Button>
             </div>

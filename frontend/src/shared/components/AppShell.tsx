@@ -61,6 +61,7 @@ const NAVEGACAO = [
   {
     grupo: null,
     itens: [
+      { para: "/turnaround", rotulo: "Turnaround", icone: RefreshCcw },
       { para: "/fluxo", rotulo: "Fluxo de caixa", icone: LayoutDashboard },
       { para: "/previsao", rotulo: "Previsão", icone: TrendingUp },
       { para: "/contratos", rotulo: "Contratos", icone: FileText },
@@ -88,7 +89,6 @@ const NAVEGACAO = [
       { para: "/plano-de-contas", rotulo: "Plano de contas", icone: FolderTree },
       { para: "/catalogo", rotulo: "Catálogo", icone: Tags },
       { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
-      { para: "/turnaround", rotulo: "Turnaround", icone: RefreshCcw },
     ],
   },
 ];

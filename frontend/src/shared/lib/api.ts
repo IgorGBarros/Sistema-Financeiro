@@ -40,6 +40,7 @@ export interface Realizado {
   parcela: string | null;
   categoria: string;
   categoria_nome: string;
+  classificacao_nome: string;
   descricao: string;
   tipo: TipoLancamento;
   competencia: string;
@@ -49,6 +50,12 @@ export interface Realizado {
   origem: "MANUAL" | "BAIXA" | "MERCADO";
   competencia_mercado: string | null;
   observacao: string;
+}
+
+export interface LinhaEvolucaoCategoria {
+  competencia: string;
+  categoria: string;
+  total: string;
 }
 
 export interface Contrato {
@@ -823,6 +830,11 @@ export const api = {
       `/realizados/por-categoria/?${qs({ competencia })}`,
     ),
 
+  evolucaoPorCategoria: (meses = 6) =>
+    request<LinhaEvolucaoCategoria[]>(
+      `/realizados/evolucao-categoria/?${qs({ meses: String(meses) })}`,
+    ),
+
   fluxoCaixa: (inicio: string, fim: string, saldoInicial = "0") =>
     request<{ linhas: LinhaFluxo[]; totais: Record<string, string> }>(
       `/fluxo-caixa/?${qs({ inicio, fim, saldo_inicial: saldoInicial })}`,
@@ -844,16 +856,6 @@ export const api = {
     request<CapacidadesAssistente>("/assistente/capacidades/"),
   conversas: () =>
     lista<{ id: string; titulo: string; atualizado_em: string }>("/assistente/"),
-
-  realizados: (filtros: Record<string, string | undefined> = {}) =>
-    lista<Realizado>(`/realizados/?${qs(filtros)}`),
-  salvarRealizado: (dados: Partial<Realizado>, id?: string) =>
-    request<Realizado>(id ? `/realizados/${id}/` : "/realizados/", {
-      method: id ? "PATCH" : "POST",
-      body: JSON.stringify(dados),
-    }),
-  deletarRealizado: (id: string) =>
-    request<void>(`/realizados/${id}/`, { method: "DELETE" }),
 
   baixarParcela: (parcela: string, valor: string, data_pagamento: string) =>
     request(`/realizados/baixar-parcela/`, {

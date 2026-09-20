@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, CreditCard, ShoppingCart, Sparkles } from "lucide-react";
 
 import { api, ApiError, type NotaFiscal } from "@/shared/lib/api";
 import { formatarMoeda } from "@/features/fiscal/nfce";
@@ -51,6 +51,7 @@ export function ConfirmacaoPagamento({
   const [cartao, setCartao] = useState("");
   const [parcelas, setParcelas] = useState(1);
   const [categoria, setCategoria] = useState("");
+  const [itensAbertos, setItensAbertos] = useState(false);
 
   const sugestao = useQuery({
     queryKey: ["nota", nota?.id, "pagamento"],
@@ -117,12 +118,41 @@ export function ConfirmacaoPagamento({
         {nota && (
           <div className="space-y-stack-md">
             <div className="rounded-lg border border-outline-variant bg-surface-container-low p-stack-sm">
-              <p className="font-medium text-on-surface">
-                {nota.nome_emitente || "Cupom"}
-              </p>
-              <p className="tabular text-headline-sm text-despesa">
-                {formatarMoeda(nota.valor_total)}
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-on-surface">
+                    {nota.nome_emitente || "Cupom"}
+                  </p>
+                  <p className="tabular text-headline-sm text-despesa">
+                    {formatarMoeda(nota.valor_total)}
+                  </p>
+                </div>
+                {(nota.itens ?? []).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setItensAbertos((v) => !v)}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-on-surface-variant hover:bg-surface-container-high"
+                  >
+                    <ShoppingCart className="h-3 w-3" />
+                    {nota.quantidade_itens} iten(s)
+                    {itensAbertos ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </button>
+                )}
+              </div>
+
+              {itensAbertos && (nota.itens ?? []).length > 0 && (
+                <div className="mt-2 space-y-1 border-t border-outline-variant pt-2">
+                  {(nota.itens ?? []).map((item) => (
+                    <div key={item.id} className="flex justify-between text-[11px] text-on-surface-variant">
+                      <span className="min-w-0 flex-1 truncate pr-2">{item.descricao}</span>
+                      <span className="shrink-0 tabular">
+                        {item.quantidade !== "1.0000" && `${item.quantidade}× `}
+                        {formatarMoeda(item.valor_total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {dica && (

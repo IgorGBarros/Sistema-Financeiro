@@ -5,6 +5,9 @@ from apps.realizados.models import Realizado
 
 class RealizadoSerializer(serializers.ModelSerializer):
     categoria_nome = serializers.CharField(source="categoria.nome", read_only=True)
+    classificacao_nome = serializers.CharField(
+        source="categoria.classificacao.nome", read_only=True
+    )
     contrato_descricao = serializers.CharField(
         source="contrato.descricao", read_only=True, default=None
     )
@@ -13,7 +16,7 @@ class RealizadoSerializer(serializers.ModelSerializer):
         model = Realizado
         fields = [
             "id", "contrato", "contrato_descricao", "parcela", "categoria",
-            "categoria_nome", "descricao", "tipo", "competencia",
+            "categoria_nome", "classificacao_nome", "descricao", "tipo", "competencia",
             "data_pagamento", "valor", "forma_pagamento", "origem",
             "competencia_mercado", "observacao",
         ]

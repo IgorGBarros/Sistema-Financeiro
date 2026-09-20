@@ -2,10 +2,10 @@ import { Suspense, lazy, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, CartesianGrid, Cell, ComposedChart, Legend, Line,
+  Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Download, ScanLine, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Download, Minus, ScanLine, TrendingDown, TrendingUp } from "lucide-react";
 
 import { api, type LinhaFluxo } from "@/shared/lib/api";
 import { exportarCsv } from "@/shared/lib/exportar";
@@ -84,6 +84,21 @@ export default function FluxoCaixa() {
 
   const primeiroNegativo = dados.find((d) => d.saldo < 0);
 
+  // KPIs do mês corrente
+  const linhas = fluxo.data?.linhas ?? [];
+  const linhaMesCorrente = linhas.find((l) => l.competencia === mesCorrente);
+  const linhaMesAnterior = (() => {
+    const [ano, m] = mesCorrente.split("-").map(Number);
+    const ant = m === 1 ? `${ano - 1}-12-01` : `${ano}-${String(m - 1).padStart(2, "0")}-01`;
+    return linhas.find((l) => l.competencia === ant);
+  })();
+  const receitaMes = Number(linhaMesCorrente?.receita_realizada ?? 0);
+  const despesaMes = Number(linhaMesCorrente?.despesa_realizada ?? 0);
+  const resultadoMes = receitaMes - despesaMes;
+  const saldoMes = Number(linhaMesCorrente?.saldo_acumulado ?? 0);
+  const saldoAnterior = Number(linhaMesAnterior?.saldo_acumulado ?? 0);
+  const variacaoSaldo = saldoAnterior !== 0 ? ((saldoMes - saldoAnterior) / Math.abs(saldoAnterior)) * 100 : 0;
+
   return (
     <div className="p-container-padding">
       <CabecalhoPagina
@@ -137,14 +152,28 @@ export default function FluxoCaixa() {
         }
       />
 
-      <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
+      {/* KPIs do mês corrente */}
+      <div className="mb-container-padding grid grid-cols-2 gap-container-padding md:grid-cols-4">
         <Kpi
-          rotulo="Saldo ao fim do período"
-          valor={fluxo.data ? formatarMoeda(fluxo.data.totais.saldo_final) : "—"}
-          icone={TrendingUp}
-          tom={
-            fluxo.data && Number(fluxo.data.totais.saldo_final) < 0 ? "despesa" : "receita"
-          }
+          rotulo={`Receita — ${formatarCompetencia(mesCorrente)}`}
+          valor={receitaMes > 0 ? formatarMoeda(receitaMes) : "—"}
+          icone={ArrowDownRight}
+          tom="receita"
+          carregando={fluxo.isLoading}
+        />
+        <Kpi
+          rotulo={`Despesa — ${formatarCompetencia(mesCorrente)}`}
+          valor={despesaMes > 0 ? formatarMoeda(despesaMes) : "—"}
+          icone={ArrowUpRight}
+          tom={despesaMes > receitaMes ? "despesa" : "neutro"}
+          carregando={fluxo.isLoading}
+        />
+        <Kpi
+          rotulo="Resultado do mês"
+          valor={receitaMes + despesaMes > 0 ? formatarMoeda(Math.abs(resultadoMes)) : "—"}
+          icone={resultadoMes >= 0 ? TrendingUp : TrendingDown}
+          tom={resultadoMes >= 0 ? "receita" : "despesa"}
+          apoio={resultadoMes >= 0 ? "Sobra no mês" : "Déficit no mês"}
           carregando={fluxo.isLoading}
         />
         <Kpi
@@ -157,6 +186,26 @@ export default function FluxoCaixa() {
               : undefined
           }
           carregando={mercado.isLoading}
+        />
+      </div>
+
+      {/* KPIs de projeção */}
+      <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
+        <Kpi
+          rotulo="Saldo ao fim do período"
+          valor={fluxo.data ? formatarMoeda(fluxo.data.totais.saldo_final) : "—"}
+          icone={TrendingUp}
+          tom={
+            fluxo.data && Number(fluxo.data.totais.saldo_final) < 0 ? "despesa" : "receita"
+          }
+          carregando={fluxo.isLoading}
+        />
+        <Kpi
+          rotulo="Variação de saldo vs. mês ant."
+          valor={saldoAnterior !== 0 ? `${variacaoSaldo >= 0 ? "+" : ""}${variacaoSaldo.toFixed(1)}%` : "—"}
+          icone={variacaoSaldo >= 0 ? TrendingUp : TrendingDown}
+          tom={variacaoSaldo >= 0 ? "receita" : "despesa"}
+          carregando={fluxo.isLoading}
         />
         <Kpi
           rotulo={primeiroNegativo ? "Saldo fica negativo em" : "Saldo positivo no período"}
@@ -213,6 +262,47 @@ export default function FluxoCaixa() {
           )}
         </CardContent>
       </Card>
+
+      {dados.length > 1 && (
+        <Card className="mt-container-padding">
+          <CardContent className="pt-6">
+            <h2 className="mb-4 text-headline-sm text-on-surface">
+              Evolução do saldo acumulado
+            </h2>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dados} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                  <defs>
+                    <linearGradient id="gradSaldo" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--secondary)" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="var(--secondary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                  />
+                  <Tooltip formatter={(v: number) => [formatarMoeda(v), "Saldo"]} labelClassName="font-medium" />
+                  <ReferenceLine y={0} stroke="var(--despesa)" strokeDasharray="4 4" strokeOpacity={0.5} />
+                  <Area
+                    type="monotone"
+                    dataKey="saldo"
+                    name="Saldo acumulado"
+                    stroke="var(--secondary)"
+                    strokeWidth={2}
+                    fill="url(#gradSaldo)"
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {dadosPizza.length > 0 && (
         <Card className="mt-container-padding">

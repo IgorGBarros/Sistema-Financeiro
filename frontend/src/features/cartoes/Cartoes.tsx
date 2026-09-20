@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, CreditCard, FileUp, Plus, TrendingUp,
+  AlertTriangle, CreditCard, FileUp, Landmark, Pencil, Plus, TrendingUp,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
@@ -153,6 +153,13 @@ export default function Cartoes() {
         </Card>
       )}
 
+      <ListaCartoes
+        aoEditarCartao={(cartao) => {
+          setEmEdicao(cartao);
+          setFormularioAberto(true);
+        }}
+      />
+
       <div className="cartao mb-container-padding overflow-hidden">
         <div className="border-b border-outline-variant bg-surface p-stack-md">
           <h2 className="text-headline-sm text-on-surface">Comprometido por mês</h2>
@@ -215,6 +222,98 @@ export default function Cartoes() {
         cartao={emEdicao}
         onFechar={() => setFormularioAberto(false)}
       />
+    </div>
+  );
+}
+
+const BANDEIRA_ROTULO: Record<string, string> = {
+  VISA: "Visa",
+  MASTERCARD: "Mastercard",
+  ELO: "Elo",
+  AMEX: "Amex",
+  HIPERCARD: "Hipercard",
+  OUTRA: "Outra",
+};
+
+interface ListaCartoesProps {
+  aoEditarCartao: (cartao: import("@/shared/lib/api").Cartao) => void;
+}
+
+function ListaCartoes({ aoEditarCartao }: ListaCartoesProps) {
+  const cartoes = useQuery({
+    queryKey: ["cartoes"],
+    queryFn: () => api.cartoes(),
+  });
+
+  const lista = cartoes.data ?? [];
+
+  if (cartoes.isLoading) return null;
+
+  return (
+    <div className="cartao mb-container-padding overflow-hidden">
+      <div className="border-b border-outline-variant bg-surface p-stack-md">
+        <h2 className="text-headline-sm text-on-surface">Meus cartões</h2>
+        <p className="mt-1 text-body-sm text-on-surface-variant">
+          Clique em editar para alterar limite, datas de fechamento ou desativar o cartão.
+        </p>
+      </div>
+      {lista.length === 0 ? (
+        <p className="p-stack-lg text-center text-body-sm text-on-surface-variant">
+          Nenhum cartão cadastrado ainda. Use o botão "Novo cartão" para adicionar.
+        </p>
+      ) : (
+        <div className="divide-y divide-outline-variant">
+          {lista.map((cartao) => (
+            <div
+              key={cartao.id}
+              className="flex items-center justify-between gap-stack-md p-stack-md"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low">
+                  <CreditCard className="h-4 w-4 text-on-surface-variant" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-on-surface">
+                    {cartao.apelido}
+                    {cartao.ultimos_digitos && (
+                      <span className="ml-1 text-on-surface-variant">
+                        ••{cartao.ultimos_digitos}
+                      </span>
+                    )}
+                    {!cartao.ativo && (
+                      <span className="ml-2 rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">
+                        Inativo
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-body-sm text-on-surface-variant">
+                    {BANDEIRA_ROTULO[cartao.bandeira] ?? cartao.bandeira}
+                    {cartao.emissor && ` · ${cartao.emissor}`}
+                    {cartao.limite && ` · Limite ${formatarMoeda(cartao.limite)}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3 text-body-sm text-on-surface-variant">
+                {cartao.dia_fechamento && (
+                  <span className="hidden sm:inline">Fecha dia {cartao.dia_fechamento}</span>
+                )}
+                {cartao.dia_vencimento && (
+                  <span className="hidden sm:inline">Vence dia {cartao.dia_vencimento}</span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => aoEditarCartao(cartao)}
+                  aria-label={`Editar ${cartao.apelido}`}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

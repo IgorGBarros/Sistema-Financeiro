@@ -448,6 +448,110 @@ export interface DocumentoImportado {
   resultado?: Record<string, unknown> | null;
 }
 
+// ---------------------------------------------------------------------------
+// Imposto de Renda
+// ---------------------------------------------------------------------------
+
+export interface DeclaracaoIR {
+  id: string;
+  ano: number;
+  modalidade: "INDIVIDUAL" | "CONJUNTA";
+  modalidade_display: string;
+  status: "RASCUNHO" | "FINALIZADA";
+  status_display: string;
+  nome_titular: string;
+  cpf_titular: string;
+  nome_conjuge: string;
+  cpf_conjuge: string;
+  observacao: string;
+  dependentes: IrDependente[];
+  despesas_medicas: IrDespesaMedica[];
+  capital_variavel: IrRendimentoCapital[];
+  outras_deducoes: IrOutraDedução[];
+}
+
+export interface IrDependente {
+  id: string;
+  declaracao: string;
+  nome: string;
+  cpf: string;
+  data_nascimento: string | null;
+  parentesco: string;
+  parentesco_display: string;
+  rendimento_proprio: string;
+  gera_deducao: boolean;
+}
+
+export interface IrDespesaMedica {
+  id: string;
+  declaracao: string;
+  tipo: string;
+  tipo_display: string;
+  prestador: string;
+  cnpj_prestador: string;
+  beneficiario: string;
+  data: string;
+  valor: string;
+  nota_fiscal: string | null;
+  observacao: string;
+}
+
+export interface IrRendimentoCapital {
+  id: string;
+  declaracao: string;
+  tipo: string;
+  tipo_display: string;
+  descricao: string;
+  cnpj_emissor: string;
+  valor_bruto: string;
+  imposto_retido: string;
+  isento: boolean;
+  data: string;
+}
+
+export interface IrOutraDedução {
+  id: string;
+  declaracao: string;
+  tipo: string;
+  tipo_display: string;
+  beneficiario: string;
+  instituicao: string;
+  cnpj_instituicao: string;
+  valor: string;
+  observacao: string;
+}
+
+export interface ResultadoCalculo {
+  modalidade: string;
+  renda_bruta_tributavel: string;
+  total_deducoes: string;
+  base_calculo: string;
+  imposto_bruto: string;
+  irrf_a_creditar: string;
+  imposto_a_pagar_ou_restituir: string;
+  aliquota_efetiva: string;
+  deducao_dependentes: string;
+  deducao_saude: string;
+  deducao_educacao: string;
+  deducao_pgbl: string;
+  deducao_pensao: string;
+  deducao_outras: string;
+  rendimentos_trabalho: string;
+  rendimentos_capital_tributavel: string;
+  rendimentos_isentos: string;
+  irrf_trabalho: string;
+  irrf_capital: string;
+  avisos: string[];
+}
+
+export interface ComparacaoIR {
+  individual_titular: ResultadoCalculo;
+  individual_conjuge: ResultadoCalculo | null;
+  conjunta: ResultadoCalculo;
+  recomendacao: string;
+  diferenca: string;
+}
+
 export interface LinhaFluxo {
   competencia: string;
   receita_prevista: string;
@@ -897,4 +1001,57 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ parcela, valor, data_pagamento }),
     }),
+
+  // --- imposto de renda ------------------------------------------------------
+  declaracoesIR: (filtros: Record<string, string | undefined> = {}) =>
+    lista<DeclaracaoIR>(`/declaracoes-ir/?${qs(filtros)}`),
+  salvarDeclaracaoIR: (dados: Partial<DeclaracaoIR>, id?: string) =>
+    request<DeclaracaoIR>(id ? `/declaracoes-ir/${id}/` : "/declaracoes-ir/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  calcularIR: (id: string) =>
+    request<ResultadoCalculo>(`/declaracoes-ir/${id}/calcular/`),
+  compararIR: (ano: number) =>
+    request<ComparacaoIR>(`/declaracoes-ir/comparar/?${qs({ ano: String(ano) })}`),
+
+  irDependentes: (declaracaoId: string) =>
+    lista<IrDependente>(`/ir-dependentes/?declaracao=${declaracaoId}`),
+  salvarIrDependente: (dados: Partial<IrDependente>, id?: string) =>
+    request<IrDependente>(id ? `/ir-dependentes/${id}/` : "/ir-dependentes/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarIrDependente: (id: string) =>
+    request<void>(`/ir-dependentes/${id}/`, { method: "DELETE" }),
+
+  irDespesasMedicas: (declaracaoId: string) =>
+    lista<IrDespesaMedica>(`/ir-despesas-medicas/?declaracao=${declaracaoId}`),
+  salvarIrDespesaMedica: (dados: Partial<IrDespesaMedica>, id?: string) =>
+    request<IrDespesaMedica>(id ? `/ir-despesas-medicas/${id}/` : "/ir-despesas-medicas/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarIrDespesaMedica: (id: string) =>
+    request<void>(`/ir-despesas-medicas/${id}/`, { method: "DELETE" }),
+
+  irCapitalVariavel: (declaracaoId: string) =>
+    lista<IrRendimentoCapital>(`/ir-capital-variavel/?declaracao=${declaracaoId}`),
+  salvarIrCapitalVariavel: (dados: Partial<IrRendimentoCapital>, id?: string) =>
+    request<IrRendimentoCapital>(id ? `/ir-capital-variavel/${id}/` : "/ir-capital-variavel/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarIrCapitalVariavel: (id: string) =>
+    request<void>(`/ir-capital-variavel/${id}/`, { method: "DELETE" }),
+
+  irOutrasDeducoes: (declaracaoId: string) =>
+    lista<IrOutraDedução>(`/ir-outras-deducoes/?declaracao=${declaracaoId}`),
+  salvarIrOutraDedução: (dados: Partial<IrOutraDedução>, id?: string) =>
+    request<IrOutraDedução>(id ? `/ir-outras-deducoes/${id}/` : "/ir-outras-deducoes/", {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify(dados),
+    }),
+  deletarIrOutraDedução: (id: string) =>
+    request<void>(`/ir-outras-deducoes/${id}/`, { method: "DELETE" }),
 };

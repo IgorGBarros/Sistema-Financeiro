@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   Building2,
+  Calculator,
   CheckCheck,
   CreditCard,
   FileText,
@@ -73,6 +74,7 @@ const NAVEGACAO = [
       { para: "/financiamento", rotulo: "Financiamento", icone: Building2 },
       { para: "/folha", rotulo: "Folha", icone: Wallet2 },
       { para: "/contas", rotulo: "Contas de consumo", icone: Lightbulb },
+      { para: "/ir", rotulo: "Imposto de Renda", icone: Calculator },
     ],
   },
   {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera, Keyboard, Loader2, RotateCcw } from "lucide-react";
@@ -39,6 +39,13 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
   // Incrementado em "Tentar de novo" para forçar o useEffect a re-executar
   // mesmo quando `modo` já é "camera" (estado não mudaria).
   const [tentativa, setTentativa] = useState(0);
+  // O Dialog do Radix usa portal — o div#leitor-qrcode só existe no DOM depois
+  // que o portal é inserido, que pode ser depois do primeiro useEffect.
+  // O useCallback ref notifica o effect exatamente quando o elemento está pronto.
+  const [divPronta, setDivPronta] = useState(false);
+  const refContainer = useCallback((node: HTMLDivElement | null) => {
+    setDivPronta(node !== null);
+  }, []);
   const online = useConexao();
   const leitorRef = useRef<Html5Qrcode | null>(null);
   const processandoRef = useRef(false);
@@ -120,12 +127,13 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
     setModo("camera");
     setChaveDigitada("");
     setErroCamera(null);
+    setDivPronta(false);
     processandoRef.current = false;
     onFechar();
   }
 
   useEffect(() => {
-    if (!aberto || modo !== "camera") {
+    if (!aberto || modo !== "camera" || !divPronta) {
       void pararCamera();
       return;
     }
@@ -183,7 +191,8 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
     };
     // `tentativa` entra nas deps para que "Tentar de novo" force o effect a
     // re-executar mesmo quando `modo` já é "camera" (nenhum estado muda).
-  }, [aberto, modo, tentativa]); // eslint-disable-line react-hooks/exhaustive-deps
+    // `divPronta` garante que o portal do Dialog já inseriu o elemento no DOM.
+  }, [aberto, modo, tentativa, divPronta]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chaveLimpa = chaveDigitada.replace(/\D/g, "");
   const chaveValida = validarChaveAcesso(chaveLimpa);
@@ -206,6 +215,7 @@ export function ScannerNota({ aberto, onFechar, onNotaCadastrada }: Props) {
           <div className="space-y-3">
             <div
               id={ID_LEITOR}
+              ref={refContainer}
               className="overflow-hidden rounded-lg border bg-muted aspect-square"
             />
             <p className="text-sm text-muted-foreground">

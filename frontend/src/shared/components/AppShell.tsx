@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   Building2,
@@ -10,17 +10,44 @@ import {
   LayoutDashboard,
   Lightbulb,
   Menu,
+  Moon,
   Receipt,
+  Scale,
+  Target,
   Search,
   Sparkles,
+  Sun,
+  Tags,
   TrendingUp,
   Wallet,
   Wallet2,
   X,
 } from "lucide-react";
 
+import { AlertasVencimento } from "@/shared/components/AlertasVencimento";
 import { BarraStatus } from "@/shared/components/BarraStatus";
+import { BuscaGlobal } from "@/shared/components/BuscaGlobal";
 import { cn } from "@/shared/lib/utils";
+
+function useTema() {
+  const [tema, setTema] = useState<"claro" | "escuro">(() => {
+    try {
+      const salvo = localStorage.getItem("tema");
+      if (salvo === "escuro" || salvo === "claro") return salvo;
+    } catch {}
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro";
+  });
+
+  function alternar() {
+    setTema((t) => {
+      const novo = t === "claro" ? "escuro" : "claro";
+      try { localStorage.setItem("tema", novo); } catch {}
+      return novo;
+    });
+  }
+
+  return { tema, alternar };
+}
 
 // Dois grupos: o que se usa todo dia e o que vem de documento importado.
 // Uma lista corrida de oito itens vira ruído — o agrupamento devolve a
@@ -49,7 +76,10 @@ const NAVEGACAO = [
   {
     grupo: null,
     itens: [
+      { para: "/aderencia", rotulo: "Aderência", icone: Scale },
+      { para: "/metas", rotulo: "Metas", icone: Target },
       { para: "/plano-de-contas", rotulo: "Plano de contas", icone: FolderTree },
+      { para: "/catalogo", rotulo: "Catálogo", icone: Tags },
       { para: "/assistente", rotulo: "Assistente", icone: Sparkles },
     ],
   },
@@ -64,9 +94,22 @@ const NAVEGACAO = [
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuAberto, setMenuAberto] = useState(false);
+  const [buscaAberta, setBuscaAberta] = useState(false);
+  const { tema, alternar } = useTema();
+
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setBuscaAberta(true);
+      }
+    };
+    window.addEventListener("keydown", atalho);
+    return () => window.removeEventListener("keydown", atalho);
+  }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className={cn("flex min-h-screen", tema === "escuro" && "dark")}>
       {/* Fundo escurecido do menu no celular */}
       {menuAberto && (
         <div
@@ -145,6 +188,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Workspace pessoal
               </p>
             </div>
+            <button
+              onClick={alternar}
+              className="ml-auto rounded-lg p-unit text-on-surface-variant hover:bg-surface-container-high"
+              title={tema === "claro" ? "Tema escuro" : "Tema claro"}
+            >
+              {tema === "claro" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </button>
           </div>
         </div>
       </nav>
@@ -160,23 +210,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </button>
 
-            {/* A busca ainda não filtra nada; fica desabilitada em vez de
-                aceitar texto e não responder. */}
-            <div className="relative ml-stack-lg hidden w-full max-w-md md:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <input
-                disabled
-                className="w-full cursor-not-allowed rounded-lg border border-outline-variant bg-surface-container-low py-2 pl-10 pr-4 text-body-sm text-on-surface placeholder:text-on-surface-variant"
-                placeholder="Busca global — em breve"
-              />
-            </div>
+            <button
+              onClick={() => setBuscaAberta(true)}
+              className="relative ml-stack-lg hidden w-full max-w-md items-center rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body-sm text-on-surface-variant hover:bg-surface-container md:flex"
+            >
+              <Search className="mr-2 h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">Buscar contratos, lançamentos…</span>
+              <kbd className="ml-2 rounded border border-outline-variant px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+            </button>
           </div>
         </header>
 
         <BarraStatus />
+        <AlertasVencimento />
 
         <main className="flex-1 overflow-x-hidden">{children}</main>
       </div>
+
+      {buscaAberta && <BuscaGlobal aoFechar={() => setBuscaAberta(false)} />}
     </div>
   );
 }

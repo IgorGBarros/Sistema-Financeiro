@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Check, CircleDollarSign, Clock, Wallet } from "lucide-react";
+import { CalendarCheck, Check, CircleDollarSign, Clock, Download, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
-import { api, ApiError, type Parcela } from "@/shared/lib/api";
+import { api, ApiError, type Parcela, type Realizado } from "@/shared/lib/api";
+import { exportarCsv } from "@/shared/lib/exportar";
+import { FormularioRealizado } from "@/features/realizados/components/FormularioRealizado";
+import { ModalConfirmacao } from "@/shared/components/ModalConfirmacao";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Kpi } from "@/shared/components/Kpi";
@@ -32,6 +35,10 @@ export default function Realizados() {
   const hoje = new Date();
   const [mes, setMes] = useState(iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)));
   const [baixando, setBaixando] = useState<Parcela | null>(null);
+  const [editando, setEditando] = useState<Realizado | null>(null);
+  const [formularioAberto, setFormularioAberto] = useState(false);
+  const [excluindo, setExcluindo] = useState<Realizado | null>(null);
+  const { toast } = useToast();
 
   const parcelas = useQuery({
     queryKey: ["parcelas", mes],
@@ -54,6 +61,18 @@ export default function Realizados() {
   const totalPendente = pendentes.reduce((t, p) => t + Number(p.valor_previsto), 0);
   const totalPago = (realizados.data ?? []).reduce((t, r) => t + Number(r.valor), 0);
 
+  const excluir = useMutation({
+    mutationFn: (id: string) => api.deletarRealizado(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["realizados"] });
+      queryClient.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      toast({ title: "Lançamento excluído" });
+      setExcluindo(null);
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao excluir", description: e.message }),
+  });
+
   function mudarMes(passo: number) {
     const [ano, m] = mes.split("-").map(Number);
     setMes(iso(new Date(ano, m - 1 + passo, 1)));
@@ -65,6 +84,32 @@ export default function Realizados() {
         titulo="Lançamentos"
         descricao="Marque o que já foi pago ou recebido. É isto que alimenta a comparação com o previsto."
         acoes={
+          <div className="flex items-center gap-stack-sm">
+          <Button
+            variant="outline"
+            onClick={() =>
+              exportarCsv(
+                `lancamentos-${mes}`,
+                (realizados.data ?? []).map((r) => ({
+                  descricao: r.descricao,
+                  tipo: r.tipo,
+                  categoria: r.categoria_nome,
+                  valor: r.valor,
+                  competencia: r.competencia,
+                  data_pagamento: r.data_pagamento,
+                  forma_pagamento: r.forma_pagamento,
+                  origem: r.origem,
+                })),
+              )
+            }
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Button onClick={() => { setEditando(null); setFormularioAberto(true); }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo lançamento
+          </Button>
           <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1">
             <Button variant="ghost" size="sm" onClick={() => mudarMes(-1)}>
               ←
@@ -75,6 +120,7 @@ export default function Realizados() {
             <Button variant="ghost" size="sm" onClick={() => mudarMes(1)}>
               →
             </Button>
+          </div>
           </div>
         }
       />
@@ -210,9 +256,9 @@ export default function Realizados() {
             {(realizados.data ?? []).map((lancamento) => (
               <div
                 key={lancamento.id}
-                className="flex items-center justify-between gap-stack-md p-stack-md"
+                className="group flex items-center justify-between gap-stack-md p-stack-md"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-on-surface">{lancamento.descricao}</p>
                   <p className="text-body-sm text-on-surface-variant">
                     {lancamento.categoria_nome} · pago em {dataCurta(lancamento.data_pagamento)}
@@ -227,6 +273,24 @@ export default function Realizados() {
                 >
                   {formatarMoeda(lancamento.valor)}
                 </span>
+                {lancamento.origem === "MANUAL" && (
+                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high hover:text-secondary"
+                      title="Editar"
+                      onClick={() => { setEditando(lancamento); setFormularioAberto(true); }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className="rounded p-1 text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
+                      title="Excluir"
+                      onClick={() => setExcluindo(lancamento)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -234,6 +298,22 @@ export default function Realizados() {
       </section>
 
       <DialogoBaixa parcela={baixando} onFechar={() => setBaixando(null)} />
+
+      <FormularioRealizado
+        aberto={formularioAberto}
+        realizado={editando}
+        onFechar={() => { setFormularioAberto(false); setEditando(null); }}
+      />
+
+      <ModalConfirmacao
+        aberto={Boolean(excluindo)}
+        titulo="Excluir lançamento"
+        mensagem={`Deseja excluir "${excluindo?.descricao}"? Esta ação não pode ser desfeita.`}
+        rotuloBotao="Excluir"
+        carregando={excluir.isPending}
+        onConfirmar={() => excluindo && excluir.mutate(excluindo.id)}
+        onFechar={() => setExcluindo(null)}
+      />
     </div>
   );
 }

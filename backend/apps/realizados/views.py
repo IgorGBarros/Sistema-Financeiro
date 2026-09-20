@@ -1,11 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
+from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from django.db import models
 from apps.common.api import WorkspaceViewSet, workspace_do_request
 from apps.contratos.models import ParcelaPrevista
 from apps.realizados.models import Realizado
@@ -22,6 +24,26 @@ class RealizadoViewSet(WorkspaceViewSet):
     filterset_fields = ["tipo", "categoria", "contrato", "competencia", "origem"]
     search_fields = ["descricao"]
     ordering_fields = ["data_pagamento", "valor", "competencia"]
+
+    @action(detail=False, methods=["get"], url_path="por-categoria")
+    def por_categoria(self, request):
+        """Totaliza realizados por categoria no mês — alimenta o gráfico de pizza."""
+        workspace = workspace_do_request(request)
+        competencia_str = request.query_params.get(
+            "competencia", hoje_local().replace(day=1).isoformat()
+        )
+        linhas = (
+            Realizado.objects.filter(workspace=workspace, competencia=competencia_str)
+            .select_related("categoria", "categoria__classificacao")
+            .values(
+                categoria=models.F("categoria__nome"),
+                classificacao=models.F("categoria__classificacao__nome"),
+                tipo=models.F("categoria__tipo"),
+            )
+            .annotate(total=Sum("valor"))
+            .order_by("-total")
+        )
+        return Response(list(linhas))
 
     @action(detail=False, methods=["post"], url_path="baixar-parcela")
     def baixar_parcela(self, request):

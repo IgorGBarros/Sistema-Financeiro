@@ -62,6 +62,34 @@ class FaturaViewSet(WorkspaceViewSet):
     http_method_names = ["get", "head", "options"]
     filterset_fields = ["cartao", "competencia", "status"]
 
+    @action(detail=True, methods=["post"], url_path="auto-conciliar")
+    def auto_conciliar(self, request, pk=None):
+        """
+        Tenta conciliar automaticamente todos os lançamentos pendentes da fatura.
+
+        Roda o mesmo algoritmo da importação, mas a pedido — útil quando novas
+        compras foram registradas depois que a fatura foi importada.
+        """
+        from apps.common.api import workspace_do_request
+        from apps.cartoes.services.importacao import _conciliar
+
+        fatura = self.get_object()
+        workspace = workspace_do_request(request)
+        pendentes = fatura.lancamentos.filter(secao="CORRENTE", parcela_compra__isnull=True)
+        conciliados = 0
+        for lancamento in pendentes:
+            parcela, metodo = _conciliar(workspace, fatura.cartao, lancamento)
+            if parcela:
+                lancamento.parcela_compra = parcela
+                lancamento.metodo_conciliacao = metodo
+                lancamento.conciliado = True
+                lancamento.save(update_fields=["parcela_compra", "metodo_conciliacao", "conciliado"])
+                conciliados += 1
+        return Response({
+            "conciliados": conciliados,
+            "pendentes_restantes": pendentes.filter(conciliado=False).count(),
+        })
+
     @action(detail=True, methods=["get"], url_path="pendencias")
     def pendencias(self, request, pk=None):
         """

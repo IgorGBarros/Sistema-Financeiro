@@ -582,6 +582,15 @@ const qs = (params: Record<string, string | undefined>) =>
     Object.entries(params).filter(([, v]) => v != null) as [string, string][],
   ).toString();
 
+export interface ResultadoBusca {
+  tipo: "contrato" | "realizado" | "nota";
+  id: string;
+  descricao: string;
+  subtitulo: string;
+  valor: string | null;
+  rota: string;
+}
+
 export const api = {
   classificacoes: () => lista<Classificacao>("/classificacoes/"),
   salvarClassificacao: (dados: Partial<Classificacao>, id?: string) =>
@@ -763,6 +772,11 @@ export const api = {
   faturas: (filtros: Record<string, string | undefined> = {}) =>
     lista<Fatura>(`/faturas/?${qs(filtros)}`),
   fatura: (id: string) => request<Fatura>(`/faturas/${id}/`),
+  autoConciliarFatura: (id: string) =>
+    request<{ conciliados: number; pendentes_restantes: number }>(
+      `/faturas/${id}/auto-conciliar/`,
+      { method: "POST" },
+    ),
   pendenciasFatura: (id: string) =>
     request<{ total: number; sem_categoria: number; lancamentos: LancamentoFatura[] }>(
       `/faturas/${id}/pendencias/`,
@@ -803,6 +817,11 @@ export const api = {
     });
   },
   documentos: () => lista<DocumentoImportado>("/documentos/"),
+
+  despesasPorCategoria: (competencia: string) =>
+    request<{ categoria: string; classificacao: string; tipo: string; total: string }[]>(
+      `/realizados/por-categoria/?${qs({ competencia })}`,
+    ),
 
   fluxoCaixa: (inicio: string, fim: string, saldoInicial = "0") =>
     request<{ linhas: LinhaFluxo[]; totais: Record<string, string> }>(

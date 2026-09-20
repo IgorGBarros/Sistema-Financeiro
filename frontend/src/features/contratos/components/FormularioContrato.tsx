@@ -11,10 +11,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/di
 import { Input } from "@/shared/ui/input";
 import { useToast } from "@/shared/ui/use-toast";
 
+const TIPOS_REGISTRO = [
+  { valor: "CONTRATO_FECHADO", rotulo: "Contrato fechado" },
+  { valor: "PREVISAO", rotulo: "Previsão" },
+  { valor: "RECORRENCIA", rotulo: "Recorrência sem contrato" },
+] as const;
+
 const esquema = z
   .object({
     descricao: z.string().min(2, "Dê um nome que você reconheça na lista."),
     tipo: z.enum(["RECEITA", "DESPESA"]),
+    tipo_registro: z.enum(["CONTRATO_FECHADO", "PREVISAO", "RECORRENCIA"]).default("CONTRATO_FECHADO"),
     categoria: z.string().uuid("Escolha uma categoria."),
     estabelecimento: z.string().uuid("Escolha de onde vem ou para onde vai."),
     valor_unitario: z.coerce.number().positive("O valor precisa ser maior que zero."),
@@ -56,6 +63,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
     resolver: zodResolver(esquema),
     defaultValues: {
       tipo: "DESPESA",
+      tipo_registro: "CONTRATO_FECHADO" as const,
       frequencia: "M",
       reajuste_anual_pct: 0,
       descricao: "",
@@ -76,6 +84,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
       formulario.reset({
         descricao: fonte.descricao ?? "",
         tipo: fonte.tipo ?? "DESPESA",
+        tipo_registro: (fonte.tipo_registro as "CONTRATO_FECHADO" | "PREVISAO" | "RECORRENCIA") ?? "CONTRATO_FECHADO",
         categoria: fonte.categoria ?? "",
         estabelecimento: fonte.estabelecimento ?? "",
         valor_unitario: Number(fonte.valor_unitario ?? 0),
@@ -137,6 +146,7 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
         {
           descricao: dados.descricao,
           tipo: dados.tipo,
+          tipo_registro: dados.tipo_registro,
           categoria: dados.categoria,
           classificacao: categoriaEscolhida?.classificacao,
           estabelecimento: dados.estabelecimento,
@@ -292,14 +302,26 @@ export function FormularioContrato({ aberto, contrato, dadosIniciais, onFechar }
             </Campo>
           </div>
 
-          <Campo rotulo="Reajuste anual (%)">
-            <Input
-              type="number"
-              step="0.1"
-              min="0"
-              {...formulario.register("reajuste_anual_pct")}
-            />
-          </Campo>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo rotulo="Reajuste anual (%)">
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...formulario.register("reajuste_anual_pct")}
+              />
+            </Campo>
+            <Campo rotulo="Tipo de registro">
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                {...formulario.register("tipo_registro")}
+              >
+                {TIPOS_REGISTRO.map((t) => (
+                  <option key={t.valor} value={t.valor}>{t.rotulo}</option>
+                ))}
+              </select>
+            </Campo>
+          </div>
 
           {resumoProjecao && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">

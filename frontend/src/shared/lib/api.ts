@@ -76,9 +76,17 @@ export interface Contrato {
   data_fim: string;
   data_rescisao: string | null;
   status: "ATIVO" | "SUSPENSO" | "RESCINDIDO" | "ENCERRADO";
+  tipo_registro: "CONTRATO_FECHADO" | "PREVISAO" | "RECORRENCIA";
   tipo_conta: "FIXO" | "VARIAVEL";
   quantidade_parcelas: number;
   valor_total_contrato: string;
+}
+
+export interface MetaOrcamentaria {
+  id: string;
+  categoria: string;
+  categoria_nome: string;
+  teto: string;
 }
 
 export interface ItemNota {
@@ -696,6 +704,15 @@ export const api = {
     request<Confronto>(`/confronto/?${qs({ inicio, fim })}`),
   saldoARealizar: () => request<SaldoARealizar>("/saldo-a-realizar/"),
 
+  metasOrcamentarias: () => lista<MetaOrcamentaria>("/metas-orcamentarias/"),
+  salvarMeta: (dados: Partial<MetaOrcamentaria>, id?: string) =>
+    request<MetaOrcamentaria>(
+      id ? `/metas-orcamentarias/${id}/` : "/metas-orcamentarias/",
+      { method: id ? "PATCH" : "POST", body: JSON.stringify(dados) },
+    ),
+  deletarMeta: (id: string) =>
+    request(`/metas-orcamentarias/${id}/`, { method: "DELETE" }),
+
   matrizContratos: (inicio: string, fim: string, agrupar_por = "estabelecimento") =>
     request<MatrizContratos>(
       `/matriz-contratos/?${qs({ inicio, fim, agrupar_por })}`,
@@ -770,6 +787,11 @@ export const api = {
       concessionaria: string;
       contrato: string | null;
     }>("/unidades-consumidoras/"),
+  vincularUnidade: (id: string, contrato: string | null) =>
+    request<{ id: string; contrato: string | null }>(
+      `/unidades-consumidoras/${id}/`,
+      { method: "PATCH", body: JSON.stringify({ contrato }) },
+    ),
   salvarCartao: (dados: Partial<Cartao>, id?: string) =>
     request<Cartao>(id ? `/cartoes/${id}/` : "/cartoes/", {
       method: id ? "PATCH" : "POST",
@@ -796,6 +818,11 @@ export const api = {
     ),
 
   holerites: () => lista<Holerite>("/holerites/"),
+  integrarHolerite: (id: string, categoria: string, data_pagamento?: string) =>
+    request<Holerite>(`/holerites/${id}/integrar/`, {
+      method: "POST",
+      body: JSON.stringify({ categoria, data_pagamento }),
+    }),
   contasConsumo: () => lista<ContaConsumo>("/contas-consumo/"),
   historicoConsumo: () =>
     request<

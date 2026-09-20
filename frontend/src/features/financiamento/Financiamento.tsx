@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Building2, CalendarCheck, Percent, Wallet } from "lucide-react";
+import { AlertTriangle, Building2, CalendarCheck, Percent, Wallet } from "lucide-react";
 
 import { api, type Financiamento as TipoFinanciamento } from "@/shared/lib/api";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
@@ -81,6 +81,12 @@ function Detalhe({ financiamento }: { financiamento: TipoFinanciamento }) {
   const parcelas = useQuery({
     queryKey: ["financiamento", financiamento.id, "parcelas"],
     queryFn: () => api.parcelasFinanciamento(financiamento.id),
+  });
+
+  const duplicidades = useQuery({
+    queryKey: ["financiamento", financiamento.id, "duplicidades"],
+    queryFn: () => api.duplicidadesFinanciamento(financiamento.id),
+    enabled: financiamento.paga_do_proprio_bolso,
   });
 
   const total = financiamento.parcelas_pagas + financiamento.parcelas_restantes;
@@ -184,6 +190,23 @@ function Detalhe({ financiamento }: { financiamento: TipoFinanciamento }) {
           {financiamento.titular && ` · titular ${financiamento.titular}`}
         </p>
       </div>
+
+      {(duplicidades.data?.duplicidades ?? []).length > 0 && (
+        <Card className="mb-container-padding border-amber-500/60">
+          <CardContent className="flex items-start gap-3 pt-6">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="text-body-sm">
+              <p className="font-medium">
+                {duplicidades.data!.duplicidades.length} parcela(s) com possível duplicidade
+              </p>
+              <p className="text-on-surface-variant">
+                Parece que estas parcelas já estão lançadas como despesa no fluxo de caixa.
+                Verifique para não contar a mesma saída duas vezes.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-container-padding lg:grid-cols-5">
         <div className="cartao p-container-padding lg:col-span-3">

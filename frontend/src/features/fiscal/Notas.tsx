@@ -4,9 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, CheckCircle2, Clock, QrCode, RefreshCw, ScanLine, Upload,
 } from "lucide-react";
+import {
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts";
 
 import { api, type NotaFiscal } from "@/shared/lib/api";
-import { formatarCnpj, formatarMoeda } from "@/features/fiscal/nfce";
+import { formatarCnpj, formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { listarPendentes } from "@/features/fiscal/fila";
 import { usePendentes, useSincronizacaoCupons } from "@/features/fiscal/hooks/useSincronizacao";
 import { ConfirmacaoPagamento } from "@/features/fiscal/components/ConfirmacaoPagamento";
@@ -67,6 +70,21 @@ export default function Notas() {
     queryKey: ["notas", "sem-pagamento"],
     queryFn: () => api.notasSemPagamento(),
   });
+
+  const consolidado = useQuery({
+    queryKey: ["notas", "consolidado"],
+    queryFn: () => api.consolidadoMercado(),
+  });
+
+  const serieConsolidado = useMemo(
+    () =>
+      (consolidado.data ?? []).slice(-6).map((m) => ({
+        mes: formatarCompetencia(m.competencia),
+        valor: Number(m.valor_total),
+        notas: m.quantidade_notas,
+      })),
+    [consolidado.data],
+  );
 
   const reconsultar = useMutation({
     mutationFn: (id: string) => api.reconsultarNota(id),
@@ -304,6 +322,33 @@ export default function Notas() {
           <PainelCupom notaId={selecionada} onFechar={() => setSelecionada(null)} />
         </div>
       </div>
+
+      {serieConsolidado.length > 0 && (
+        <div className="mt-container-padding cartao p-container-padding">
+          <h2 className="text-headline-sm text-on-surface">Gasto no mercado — últimos 6 meses</h2>
+          <p className="mb-stack-md mt-1 text-body-sm text-on-surface-variant">
+            Total de todas as notas do mercado (categoria consolida_mercado) por mês.
+          </p>
+          <div className="h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={serieConsolidado} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis
+                  tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                />
+                <Tooltip
+                  formatter={(v: number) => [formatarMoeda(v), "Total"]}
+                />
+                <Bar dataKey="valor" name="Total" fill="var(--despesa)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <Suspense fallback={null}>
         {scannerAberto && (

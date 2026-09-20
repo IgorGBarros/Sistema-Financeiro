@@ -1,5 +1,15 @@
 from rest_framework import serializers
 
+from apps.relatorios.models import MetaOrcamentaria
+
+
+class MetaOrcamentariaSerializer(serializers.ModelSerializer):
+    categoria_nome = serializers.CharField(source="categoria.nome", read_only=True)
+
+    class Meta:
+        model = MetaOrcamentaria
+        fields = ["id", "categoria", "categoria_nome", "teto"]
+
 
 class FluxoMensalSerializer(serializers.Serializer):
     competencia = serializers.DateField()

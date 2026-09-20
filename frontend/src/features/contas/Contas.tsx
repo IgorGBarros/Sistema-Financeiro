@@ -1,17 +1,20 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Gauge, Lightbulb, TrendingDown, TrendingUp } from "lucide-react";
+import { Gauge, Lightbulb, Link2, TrendingDown, TrendingUp, Unlink } from "lucide-react";
 
-import { api } from "@/shared/lib/api";
+import { api, ApiError } from "@/shared/lib/api";
 import { formatarCompetencia, formatarMoeda } from "@/features/fiscal/nfce";
 import { CabecalhoPagina } from "@/shared/components/CabecalhoPagina";
 import { Selo } from "@/shared/components/Selo";
 import { Kpi } from "@/shared/components/Kpi";
+import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { useToast } from "@/shared/ui/use-toast";
 
 /**
  * Contas de consumo.
@@ -29,46 +32,130 @@ import { Card, CardContent } from "@/shared/ui/card";
  * confirmar o previsto em vez de virar despesa nova.
  */
 function UnidadesConsumidoras() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [vinculando, setVinculando] = useState<string | null>(null);
+  const [contratoId, setContratoId] = useState("");
+
   const unidades = useQuery({
     queryKey: ["unidades-consumidoras"],
     queryFn: () => api.unidadesConsumidoras(),
   });
+
+  const contratos = useQuery({
+    queryKey: ["contratos", "DESPESA"],
+    queryFn: () => api.contratos({ tipo: "DESPESA" }),
+    enabled: Boolean(vinculando),
+  });
+
+  const vincular = useMutation({
+    mutationFn: ({ id, contrato }: { id: string; contrato: string | null }) =>
+      api.vincularUnidade(id, contrato),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unidades-consumidoras"] });
+      toast({ title: "Unidade atualizada" });
+      setVinculando(null);
+    },
+    onError: (e: ApiError) =>
+      toast({ variant: "destructive", title: "Erro ao vincular", description: e.message }),
+  });
+
   const lista = unidades.data ?? [];
   if (lista.length === 0) return null;
 
   const semContrato = lista.filter((u) => !u.contrato);
+  const unidadeVinculando = lista.find((u) => u.id === vinculando);
 
   return (
-    <div className="cartao mb-container-padding overflow-hidden">
-      <div className="border-b border-outline-variant bg-surface p-stack-md">
-        <h2 className="text-headline-sm text-on-surface">Unidades consumidoras</h2>
-        {semContrato.length > 0 && (
-          <p className="mt-1 text-body-sm text-on-surface-variant">
-            {semContrato.length} sem contrato vinculado: a conta entra como
-            despesa nova em vez de confirmar a parcela prevista.
-          </p>
-        )}
-      </div>
-      <div className="divide-y divide-outline-variant">
-        {lista.map((unidade) => (
-          <div key={unidade.id} className="flex items-center justify-between gap-2 p-stack-md">
-            <div className="min-w-0">
-              <p className="truncate text-on-surface">
-                {unidade.apelido || unidade.codigo_cliente}
-              </p>
-              <p className="text-body-sm text-on-surface-variant">
-                {unidade.concessionaria || unidade.servico} · cliente {unidade.codigo_cliente}
-              </p>
+    <>
+      <div className="cartao mb-container-padding overflow-hidden">
+        <div className="border-b border-outline-variant bg-surface p-stack-md">
+          <h2 className="text-headline-sm text-on-surface">Unidades consumidoras</h2>
+          {semContrato.length > 0 && (
+            <p className="mt-1 text-body-sm text-on-surface-variant">
+              {semContrato.length} sem contrato vinculado: a conta entra como
+              despesa nova em vez de confirmar a parcela prevista.
+            </p>
+          )}
+        </div>
+        <div className="divide-y divide-outline-variant">
+          {lista.map((unidade) => (
+            <div key={unidade.id} className="flex items-center justify-between gap-2 p-stack-md">
+              <div className="min-w-0">
+                <p className="truncate text-on-surface">
+                  {unidade.apelido || unidade.codigo_cliente}
+                </p>
+                <p className="text-body-sm text-on-surface-variant">
+                  {unidade.concessionaria || unidade.servico} · cliente {unidade.codigo_cliente}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {unidade.contrato ? (
+                  <>
+                    <Selo tom="sucesso">
+                      <Link2 className="h-3 w-3" />
+                      vinculada
+                    </Selo>
+                    <button
+                      title="Desvincular"
+                      className="rounded p-1 text-on-surface-variant hover:bg-surface-container-high"
+                      onClick={() => vincular.mutate({ id: unidade.id, contrato: null })}
+                    >
+                      <Unlink className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setVinculando(unidade.id); setContratoId(""); }}
+                  >
+                    <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                    Vincular contrato
+                  </Button>
+                )}
+              </div>
             </div>
-            {unidade.contrato ? (
-              <Selo tom="sucesso">vinculada</Selo>
-            ) : (
-              <Selo tom="aviso">sem contrato</Selo>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+
+      <Dialog open={Boolean(vinculando)} onOpenChange={(v) => !v && setVinculando(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Vincular unidade a contrato</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-body-sm text-on-surface-variant">
+              {unidadeVinculando?.apelido || unidadeVinculando?.codigo_cliente} —{" "}
+              {unidadeVinculando?.concessionaria || unidadeVinculando?.servico}
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Contrato de despesa</label>
+              <select
+                className="h-10 w-full rounded-md border border-outline-variant bg-background px-3 text-sm"
+                value={contratoId}
+                onChange={(e) => setContratoId(e.target.value)}
+              >
+                <option value="">Escolha…</option>
+                {(contratos.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.descricao}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setVinculando(null)}>Cancelar</Button>
+              <Button
+                disabled={!contratoId || vincular.isPending}
+                onClick={() => vinculando && vincular.mutate({ id: vinculando, contrato: contratoId })}
+              >
+                {vincular.isPending ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

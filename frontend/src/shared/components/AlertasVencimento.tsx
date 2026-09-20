@@ -46,14 +46,14 @@ export function AlertasVencimento() {
   if (total === 0) return null;
 
   return (
-    <div className="border-b border-outline-variant bg-amber-50 px-container-padding py-2 dark:bg-amber-950/20">
+    <div className="border-b border-warning/30 bg-warning-container px-container-padding py-2">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <div className="flex-1 text-body-sm">
-          <span className="font-semibold text-amber-800 dark:text-amber-400">
+          <span className="font-semibold text-on-warning-container">
             {total} vencimento{total > 1 ? "s" : ""} nos próximos {DIAS_ALERTA} dias:
           </span>{" "}
-          <span className="text-amber-700 dark:text-amber-300">
+          <span className="text-on-warning-container">
             {[
               ...alertasParcelas.map((p) => {
                 const d = diasAte(p.data_planejada);
@@ -67,12 +67,13 @@ export function AlertasVencimento() {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Link to="/lancamentos" className="text-body-sm font-medium text-amber-700 hover:underline dark:text-amber-400">
+          <Link to="/lancamentos" className="text-body-sm font-medium text-on-warning-container hover:underline">
             Ver lançamentos
           </Link>
           <button
             onClick={() => setDispensado(true)}
-            className="text-amber-600 hover:text-amber-800"
+            className="text-warning hover:opacity-80"
+            aria-label="Dispensar alerta"
           >
             <X className="h-4 w-4" />
           </button>

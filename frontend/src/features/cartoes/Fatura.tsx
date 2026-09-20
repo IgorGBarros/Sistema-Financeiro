@@ -155,9 +155,9 @@ export default function Fatura() {
       </div>
 
       {Math.abs(divergencia) > 0.02 && (
-        <Card className="mb-container-padding border-amber-500/60">
+        <Card className="mb-container-padding border-warning/60">
           <CardContent className="flex items-start gap-3 pt-6">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="text-body-sm">
               <p className="font-medium">
                 A soma dos lançamentos não bate com o total da fatura
@@ -259,7 +259,7 @@ function TabelaLancamentos({
               key={linha.id}
               className={cn(
                 "h-[40px] border-b border-outline-variant",
-                destacar && "bg-amber-50/60 dark:bg-amber-950/20",
+                destacar && "bg-warning-container/30",
               )}
             >
               <td className="px-gutter-table tabular text-on-surface-variant">

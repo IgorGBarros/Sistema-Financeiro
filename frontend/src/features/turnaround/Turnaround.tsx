@@ -39,7 +39,7 @@ function formatarPct(valor: string) {
 
 function corComprometimento(pct: number) {
   if (pct <= 50) return "text-receita";
-  if (pct <= 75) return "text-amber-500";
+  if (pct <= 75) return "text-warning";
   return "text-despesa";
 }
 
@@ -70,7 +70,7 @@ function PainelDiagnostico({ saldoAtual }: { saldoAtual: string }) {
 
   const semaforo = {
     verde: { icone: CheckCircle2, cor: "text-receita", texto: "Saudável" },
-    amarelo: { icone: AlertTriangle, cor: "text-amber-500", texto: "Atenção" },
+    amarelo: { icone: AlertTriangle, cor: "text-warning", texto: "Atenção" },
     vermelho: { icone: XCircle, cor: "text-despesa", texto: "Crítico" },
   };
 
@@ -133,7 +133,7 @@ function PainelDiagnostico({ saldoAtual }: { saldoAtual: string }) {
                   Number(d.comprometimento_pct) <= 50
                     ? "bg-receita"
                     : Number(d.comprometimento_pct) <= 75
-                      ? "bg-amber-500"
+                      ? "bg-warning"
                       : "bg-despesa",
                 )}
                 style={{ width: `${Math.min(100, Number(d.comprometimento_pct))}%` }}
@@ -301,7 +301,7 @@ function LinhaContrato({
                     ? op.tipo === "ESSENCIAL"
                       ? "border-receita bg-receita/10"
                       : op.tipo === "BOM"
-                        ? "border-amber-500 bg-amber-500/10"
+                        ? "border-warning bg-warning/10"
                         : "border-despesa bg-despesa/10"
                     : "border-outline-variant hover:border-outline hover:bg-surface-container-low",
                 )}
@@ -544,7 +544,7 @@ function BannerRecuperacao({
   onIniciar: () => void;
 }) {
   return (
-    <div className="mb-container-padding rounded-xl border border-despesa/30 bg-red-50 p-container-padding dark:bg-red-950/20">
+    <div className="mb-container-padding rounded-xl border border-despesa/30 bg-error-container p-container-padding">
       <div className="mb-stack-md flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-body-sm font-semibold uppercase tracking-wider text-despesa">
@@ -821,7 +821,7 @@ export default function Turnaround() {
                 "Mantém a vida funcionando — moradia, alimentação, saúde, transporte. Nunca cortar.",
             },
             {
-              cor: "border-l-amber-500",
+              cor: "border-l-warning",
               titulo: "Bom",
               texto:
                 "Aumenta previsibilidade ou capacidade produtiva. Manter e monitorar.",

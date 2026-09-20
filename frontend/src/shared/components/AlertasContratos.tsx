@@ -32,9 +32,9 @@ export function AlertasContratos() {
   if (descartado || vencendoEmBreve.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-50 px-container-padding py-2 dark:bg-amber-950/20">
-      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-      <p className="flex-1 text-body-sm text-amber-800 dark:text-amber-200">
+    <div className="flex items-center gap-3 border-b border-warning/30 bg-warning-container px-container-padding py-2">
+      <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+      <p className="flex-1 text-body-sm text-on-warning-container">
         {vencendoEmBreve.length === 1 ? (
           <>
             O contrato{" "}
@@ -63,7 +63,7 @@ export function AlertasContratos() {
       </p>
       <button
         onClick={() => setDescartado(true)}
-        className="shrink-0 text-amber-600 hover:text-amber-800"
+        className="shrink-0 text-warning hover:opacity-80"
         aria-label="Fechar alerta"
       >
         <X className="h-4 w-4" />

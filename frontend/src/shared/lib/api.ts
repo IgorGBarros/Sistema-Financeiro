@@ -818,6 +818,8 @@ export const api = {
     ),
 
   holerites: () => lista<Holerite>("/holerites/"),
+  confirmarHolerite: (id: string) =>
+    request<Holerite>(`/holerites/${id}/confirmar/`, { method: "POST" }),
   integrarHolerite: (id: string, categoria: string, data_pagamento?: string) =>
     request<Holerite>(`/holerites/${id}/integrar/`, {
       method: "POST",
@@ -883,6 +885,8 @@ export const api = {
     request<CapacidadesAssistente>("/assistente/capacidades/"),
   conversas: () =>
     lista<{ id: string; titulo: string; atualizado_em: string }>("/assistente/"),
+  deletarConversa: (id: string) =>
+    request<void>(`/assistente/${id}/`, { method: "DELETE" }),
 
   baixarParcela: (parcela: string, valor: string, data_pagamento: string) =>
     request(`/realizados/baixar-parcela/`, {

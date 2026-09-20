@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle, ArrowDownToLine, ArrowUpFromLine, Copy, ExternalLink, List,
-  ListChecks, Plus, Scale, SlidersHorizontal, Table2, TrendingUp, XCircle,
+  ListChecks, Plus, Scale, Search, SlidersHorizontal, Table2, TrendingUp, XCircle,
 } from "lucide-react";
 
 import { api, type Contrato, type TipoLancamento } from "@/shared/lib/api";
 import { formatarMoeda } from "@/features/fiscal/nfce";
+import { Input } from "@/shared/ui/input";
 import { FormularioContrato } from "@/features/contratos/components/FormularioContrato";
 import { ModalRescindir } from "@/features/contratos/components/ModalRescindir";
 import { PainelProjecao } from "@/features/contratos/components/PainelProjecao";
@@ -35,8 +36,15 @@ const vigencia = (inicio: string, fim: string) => {
   return `${curto(inicio)} - ${curto(fim)}`;
 };
 
+type FiltroStatus = "TODOS" | "ATIVO" | "RESCINDIDO" | "SUSPENSO" | "ENCERRADO";
+type FiltroRegistro = "TODOS" | "CONTRATO_FECHADO" | "PREVISAO" | "RECORRENCIA";
+
 export default function Contratos() {
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("ATIVO");
+  const [filtroRegistro, setFiltroRegistro] = useState<FiltroRegistro>("TODOS");
+  const [busca, setBusca] = useState("");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [visao, setVisao] = useState<Visao>("lista");
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Contrato | null>(null);
@@ -45,16 +53,27 @@ export default function Contratos() {
   const [emRescisao, setEmRescisao] = useState<Contrato | null>(null);
 
   const contratos = useQuery({
-    queryKey: ["contratos", filtro],
-    queryFn: () => api.contratos(filtro === "TODOS" ? {} : { tipo: filtro }),
+    queryKey: ["contratos", filtro, filtroStatus, filtroRegistro, busca],
+    queryFn: () =>
+      api.contratos({
+        ...(filtro !== "TODOS" ? { tipo: filtro } : {}),
+        ...(filtroStatus !== "TODOS" ? { status: filtroStatus } : {}),
+        ...(filtroRegistro !== "TODOS" ? { tipo_registro: filtroRegistro } : {}),
+        ...(busca ? { search: busca } : {}),
+      }),
   });
 
-  // Os KPIs saem dos contratos já carregados, sem uma segunda requisição.
+  // Os KPIs usam todos os contratos ATIVOS — independente dos filtros da UI.
+  const kpiContratos = useQuery({
+    queryKey: ["contratos", "kpi"],
+    queryFn: () => api.contratos({ status: "ATIVO" }),
+  });
+
   const indicadores = useMemo(() => {
-    const lista = contratos.data ?? [];
+    const lista = kpiContratos.data ?? [];
     const mensal = (tipo: TipoLancamento) =>
       lista
-        .filter((c) => c.tipo === tipo && c.status === "ATIVO" && c.frequencia === "M")
+        .filter((c) => c.tipo === tipo && c.frequencia === "M")
         .reduce((total, c) => total + Number(c.valor_unitario), 0);
 
     const receitas = mensal("RECEITA");
@@ -63,9 +82,9 @@ export default function Contratos() {
       receitas,
       despesas,
       sobra: receitas - despesas,
-      ativos: lista.filter((c) => c.status === "ATIVO").length,
+      ativos: lista.length,
     };
-  }, [contratos.data]);
+  }, [kpiContratos.data]);
 
   const lista = contratos.data ?? [];
 
@@ -93,7 +112,10 @@ export default function Contratos() {
         descricao="Entradas e saídas com vigência própria, e a projeção que nasce delas."
         acoes={
           <>
-            <Button variant="outline" disabled title="Filtros avançados em breve">
+            <Button
+              variant={filtrosAbertos ? "secondary" : "outline"}
+              onClick={() => setFiltrosAbertos((v) => !v)}
+            >
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               Filtros
             </Button>
@@ -104,6 +126,57 @@ export default function Contratos() {
           </>
         }
       />
+
+      {filtrosAbertos && (
+        <div className="mb-container-padding cartao p-stack-md flex flex-wrap items-end gap-stack-md">
+          <div className="space-y-1.5">
+            <p className="rotulo">Busca</p>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+              <Input
+                className="pl-8 w-48"
+                placeholder="Nome ou estabelecimento"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <p className="rotulo">Situação</p>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
+            >
+              <option value="TODOS">Todos</option>
+              <option value="ATIVO">Ativo</option>
+              <option value="SUSPENSO">Suspenso</option>
+              <option value="RESCINDIDO">Rescindido</option>
+              <option value="ENCERRADO">Encerrado</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <p className="rotulo">Tipo de registro</p>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={filtroRegistro}
+              onChange={(e) => setFiltroRegistro(e.target.value as FiltroRegistro)}
+            >
+              <option value="TODOS">Todos</option>
+              <option value="CONTRATO_FECHADO">Contrato fechado</option>
+              <option value="PREVISAO">Previsão</option>
+              <option value="RECORRENCIA">Recorrência</option>
+            </select>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setFiltroStatus("ATIVO"); setFiltroRegistro("TODOS"); setBusca(""); }}
+          >
+            Limpar filtros
+          </Button>
+        </div>
+      )}
 
       <div className="mb-container-padding grid grid-cols-1 gap-container-padding md:grid-cols-3">
         <Kpi
@@ -348,12 +421,6 @@ export default function Contratos() {
         contrato={emEdicao}
         dadosIniciais={dadosDuplicacao}
         onFechar={() => { setFormularioAberto(false); setDadosDuplicacao(undefined); }}
-      />
-
-      <ModalRescindir
-        aberto={rescindirAberto}
-        contrato={emRescisao}
-        onFechar={() => { setRescindirAberto(false); setEmRescisao(null); }}
       />
 
       <ModalRescindir

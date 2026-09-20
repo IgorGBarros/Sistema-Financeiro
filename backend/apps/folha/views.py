@@ -24,6 +24,25 @@ class HoleriteViewSet(WorkspaceViewSet):
     http_method_names = ["get", "head", "options", "post"]
     filterset_fields = ["competencia", "tipo_folha", "conferencia_ok"]
 
+    @action(detail=True, methods=["post"], url_path="confirmar")
+    def confirmar(self, request, pk=None):
+        """
+        Marca o holerite como conferido (conferencia_ok=True).
+
+        A integração exige conferência prévia: este endpoint separa o ato de
+        revisar do ato de lançar, permitindo que o mesmo recibo seja conferido
+        num dispositivo e integrado noutro.
+        """
+        holerite = self.get_object()
+        if holerite.conferencia_ok:
+            return Response(
+                {"detalhe": "Holerite já está marcado como conferido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        holerite.conferencia_ok = True
+        holerite.save(update_fields=["conferencia_ok"])
+        return Response(HoleriteSerializer(holerite).data, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="integrar")
     def integrar(self, request, pk=None):
         """
